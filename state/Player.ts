@@ -12,8 +12,14 @@ export class Player extends Schema  {
     @type("boolean")
     isTurn: boolean;
 
+    @type("boolean")
+    inRound: boolean;
+
     @type("number")
     bb: number;
+
+    @type("number")
+    currentBet: number;
 
     @type("string")
     public readonly id: string;
@@ -30,6 +36,8 @@ export class Player extends Schema  {
         this.isDealer = false;
         this.isTurn = false;
         this.bb = 0;
+        this.inRound = false;
+        this.currentBet = 0;
     }
 
     public get isReady(): boolean {

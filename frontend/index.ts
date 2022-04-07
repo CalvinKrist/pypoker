@@ -11,5 +11,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     room.onStateChange((newState: GameState) => {
         renderer.scenes[0].updateState(newState);
+        renderer.scenes[0].onPlayerNumChange();
     });
+    room.state.onChange = (changes) => {
+        renderer.scenes[0].onStateChanges(changes);
+    };
+
 });
