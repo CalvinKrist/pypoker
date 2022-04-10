@@ -157,7 +157,7 @@ class UserSprite extends Phaser.GameObjects.Container {
     update(scene, player) {
         let name_str = player.id;
         let bb = player.bb;
-        let hand = Array.from(player.hand["$items"].values())
+        let hand = Array.from(player.hand.values())
         let isDealer = player.isDealer;
         let active = player.isTurn;
 
@@ -178,6 +178,7 @@ class UserSprite extends Phaser.GameObjects.Container {
         this.name.text = name_str;
         this.num_chips_label.setText(bb + " bb");
 
+        // TODO: this deletion code crashes things when the screen is resized
         if (this.card1 != null) {
             this.card1.destroy();
         }
@@ -294,13 +295,21 @@ class PlayGame extends Phaser.Scene {
                 this.pot_size.x = pot_size_x_anchor + this.pot_size.displayWidth;
             }
         });
+        PubSub.subscribe('winner', (_, change) => {
+            if (change.previousValue != change.value) {
+                if(change.value != null && typeof change.value.id !== 'undefined') {
+                    this.pot_size.setVisible(false);
+                } 
+            }
+        });
 
         this.dealerChit = new DealerChit(this, 0, 0);
         this.dealerChit.setVisible(false);
 
         let player_sprites = [];
+        
         for (let i = 0; i < 6; i++) {
-            player_sprites.push(new UserSprite(this, -1000, -1000, this.state.player_map["$items"].values().next().value, this.userId, this.dealerChit));
+            player_sprites.push(new UserSprite(this, -1000, -1000, this.state.player_map.values().next().value, this.userId, this.dealerChit));
         }
 
         this.fold = this.drawButton("Fold", this.cameras.main.width * 0.7, this.cameras.main.height * 0.9, () => { this.room.send("fold", FOLD) });
@@ -348,13 +357,13 @@ class PlayGame extends Phaser.Scene {
             this.bet_submit_btn.visible = visible;
         });
 
-        PubSub.subscribe('player-num-change', (_, __) => {
+        PubSub.subscribe('player-change', (_, __) => {
             for(let player_sprite of player_sprites) {
                 player_sprite.setVisible(false);
             }
 
-            const player_ids = this.state.player_order["$items"];
-            const players = this.state.player_map["$items"];
+            const player_ids = this.state.player_order;
+            const players = this.state.player_map;
             // Rotate the player state so the player is in the center bottom
             let player_keys = Array.from(player_ids.values())
             while (players.get(player_keys[0]).id != this.userId) {
@@ -365,13 +374,13 @@ class PlayGame extends Phaser.Scene {
             for (let key of player_keys) {
                 const [x, y] = this.get_player_location(players.size, index++);
 
-                player_sprites[index].update(this, players.get(key));
                 player_sprites[index].setPosition(x, y);
+                player_sprites[index].update(this, players.get(key));
                 player_sprites[index].setVisible(true);
             }
 
             // Create player actions
-            if (this.state.running && players.get(this.userId).isTurn) {
+            if ((this.state.winner == null || typeof this.state.winner.id == 'undefined') && this.state.running && players.get(this.userId).isTurn) {
                 this.fold.setVisible(true);
                 this.call.setVisible(true);
                 this.raise_btn.setVisible(true);
@@ -384,7 +393,7 @@ class PlayGame extends Phaser.Scene {
                 this.bet_submit_btn.setVisible(false);
             }
         })
-        PubSub.publishSync('player-num-change', {});
+        PubSub.publishSync('player-change', {});
 
         this.startbutton = this.drawButton("BEGIN", screenCenterX, screenCenterY, () => {
             this.room.send("ready", READY);
@@ -406,6 +415,15 @@ class PlayGame extends Phaser.Scene {
                 }
             }
         });
+        PubSub.subscribe('winner', (_, change) => {
+            if (change.previousValue != change.value) {
+                if(change.value != null && typeof change.value.id !== 'undefined') {
+                    this.startbutton.setVisible(true);
+                    this.startbutton.setText("NEXT HAND");
+                    this.children.bringToTop(this.startbutton);
+                }
+            }
+        });
 
         // Draw the river
         let board_sprites = [];
@@ -414,14 +432,14 @@ class PlayGame extends Phaser.Scene {
                 card.destroy();
             }
 
-            let board = Array.from(this.state.board["$items"])
+            let board = Array.from(this.state.board)
             if (board.length > 0) {
                 let card_with = gameOptions.cardWidth * gameOptions.cardScale + 15;
                 let x_offset = screenCenterX - card_with * board.length / 2 + card_with / 2;
 
                 let i = 0;
                 for (let card of board) {
-                    let card_sprite = this.createCard(card[1].suit, card[1].value).setOrigin(0.5);
+                    let card_sprite = this.createCard(card.suit, card.value).setOrigin(0.5);
                     card_sprite.x = i * card_with + x_offset;
                     card_sprite.y = screenCenterY;
 
@@ -429,13 +447,42 @@ class PlayGame extends Phaser.Scene {
                     board_sprites.push(card_sprite);
                 }
             }
-        }
-        this.state.board.onAdd = (c1, c2) => {
+        }        
+        this.room.state.board.onAdd = (c1, c2) => {
             update_board();
         }
-        this.state.board.onRemove = (c1, c2) => {
+        this.room.state.board.onRemove = (c1, c2) => {
             update_board();
         }
+
+        // Draw the winner
+        this.winner_text = this.add.text(screenCenterX, screenCenterY * .7, '', {
+            fontFamily: 'Quicksand',
+            fontSize: '64px',
+            color: '#fff',
+            align: 'center',
+            stroke: "#000",
+            fontWeight: 'bold',
+            strokeThickness: 8
+        }).setOrigin(0.5).setVisible(false);
+        // The value is filled in, even when it's null for the server -- 
+        // but it's primitive children can be undefined
+        if(this.state.winner != null && typeof this.state.winner.id !== 'undefined') {
+            this.winner_text.setVisible(true);
+            this.winner_text.setText('Winner: ' + this.state.winner.id);
+        }
+        PubSub.subscribe('winner', (_, change) => {
+            if (change.previousValue != change.value) {
+                if(change.value != null && typeof change.value.id !== 'undefined') {
+                    this.winner_text.setVisible(true);
+                    this.winner_text.setText('Winner: ' + change.value.id);
+                } else {
+                    this.winner_text.setVisible(false);
+                }
+
+                this.children.bringToTop(this.winner_text);
+            }
+        });
 
     } // end of create function
 
@@ -458,6 +505,7 @@ class PlayGame extends Phaser.Scene {
 
     updateState(gameState) {
         this.state = gameState;
+        PubSub.publishSync('player-change', this.state);
     }
 
     onStateChanges(changes) {
@@ -466,10 +514,6 @@ class PlayGame extends Phaser.Scene {
                 PubSub.publishSync(change.field, change);
             }
         });
-    }
-
-    onPlayerNumChange() {
-        PubSub.publishSync('player-num-change', this.state);
     }
 
     setUserId(userId) {

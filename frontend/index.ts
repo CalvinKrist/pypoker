@@ -10,11 +10,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderer.scenes[0].setRoom(room);
 
     room.onStateChange((newState: GameState) => {
-        renderer.scenes[0].updateState(newState);
-        renderer.scenes[0].onPlayerNumChange();
+        //console.log(newState);
+        //renderer.scenes[0].updateState(newState);
     });
     room.state.onChange = (changes) => {
         renderer.scenes[0].onStateChanges(changes);
     };
+
+    room.onMessage("update-state", (state) => {
+        state.player_map = new Map(Object.entries(state.player_map))
+        renderer.scenes[0].updateState(state);        
+    });
 
 });

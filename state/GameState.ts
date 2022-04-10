@@ -22,6 +22,9 @@ export class GameState extends Schema {
     @type("number")
     pot: number;
 
+    @type(Player)
+    winner: Player;
+
     constructor() {
         super();
         this.deck = new Deck();
@@ -30,6 +33,7 @@ export class GameState extends Schema {
         this.player_order = new ArraySchema<string>();
         this.pot = 0;
         this.board = new ArraySchema<Card>();
+        this.winner = null;
     }
 
 }

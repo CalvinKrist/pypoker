@@ -1,9 +1,9 @@
-import {Client, Delayed, Room} from "colyseus";
-import {GameState} from "../state/GameState";
-import {Player} from "../state/Player";
-import {ArraySchema} from "@colyseus/schema";
-import {ReadyState} from "../messages/readystate";
-import {Fold, Call, Raise} from "../messages/playeraction";
+import { Client, Delayed, Room } from "colyseus";
+import { GameState } from "../state/GameState";
+import { Player } from "../state/Player";
+import { ArraySchema } from "@colyseus/schema";
+import { ReadyState } from "../messages/readystate";
+import { Fold, Call, Raise } from "../messages/playeraction";
 import { Deck } from "../state/Deck";
 import { Card } from "../state/Card";
 
@@ -14,7 +14,7 @@ enum Gamestate {
     Turn,
     River,
     EndGame
-  }
+}
 
 export class PokerRoom extends Room<GameState> {
     gameState: Gamestate;
@@ -39,6 +39,7 @@ export class PokerRoom extends Room<GameState> {
                 return false;
             }
         }
+
         return true;
     }
 
@@ -57,64 +58,79 @@ export class PokerRoom extends Room<GameState> {
         player.isTurn = false;
         next_player.isTurn = true;
 
-        if(leaveRound) {
+        if (leaveRound) {
             player.inRound = false;
         }
+
+        console.log("incrementPlayerTurn")
     }
 
     private transitionIfNeeded() {
-        if(this.getCurrentPlayer().id == this.currentPlay) {
-            if(this.gameState == Gamestate.Preflop) {
+        if (this.getCurrentPlayer().id == this.currentPlay) {
+            if (this.gameState == Gamestate.Preflop) {
                 this.transitionState(Gamestate.Flop);
-            } else if(this.gameState == Gamestate.Flop) {
+            } else if (this.gameState == Gamestate.Flop) {
                 this.transitionState(Gamestate.Turn);
-            } else if(this.gameState == Gamestate.Turn) {
+            } else if (this.gameState == Gamestate.Turn) {
                 this.transitionState(Gamestate.River);
-            } else if(this.gameState == Gamestate.River) {
+            } else if (this.gameState == Gamestate.River) {
                 this.transitionState(Gamestate.EndGame);
             }
         }
+        console.log("transitionIfNeeded")
     }
 
     private nextStatePostFlop(numCardsToDeal: number) {
-            this.currentBet = 0;
-            this.lastRaise = 0;
+        this.currentBet = 0;
+        this.lastRaise = 0;
 
-            for(let i = 0; i < numCardsToDeal; i++) {
-                this.state.board.push(this.state.deck.deal());
+        for (let i = 0; i < numCardsToDeal; i++) {
+            this.state.board.push(this.state.deck.deal());
+        }
+
+        this.state.player_map.forEach((player) => { player.currentBet = 0; player.isTurn = false; })
+
+        let dealer = Array.from(this.state.player_map.values()).filter(player => player.isDealer)[0];
+        let dealer_index = this.state.player_order.indexOf(dealer.id);
+        let sb_index = dealer_index; // In heads-up poker, dealer is SB and the other player is BB
+        if (this.state.player_order.length > 2) {
+            sb_index = (dealer_index + 1) % this.state.player_order.length;
+        }
+
+        // The sb might not be in the game any more so we need to find the next player
+        let active_player = null;
+        let i = sb_index;
+        while (active_player == null) {
+            let p_id = this.state.player_order[i % this.state.player_order.length];
+            if (this.state.player_map.get(p_id).inRound) {
+                active_player = this.state.player_map.get(p_id)
+            } else {
+                i++;
             }
+        }
 
-            this.state.player_map.forEach((player) => {player.currentBet = 0; player.isTurn = false;})
+        active_player.isTurn = true;
+        this.currentPlay = active_player.id;
 
-            let dealer = Array.from(this.state.player_map.values()).filter(player => player.isDealer)[0];
-            let dealer_index = this.state.player_order.indexOf(dealer.id);
-            let sb_index = dealer_index; // In heads-up poker, dealer is SB and the other player is BB
-            if (this.state.player_order.length > 2) {
-                sb_index = (dealer_index + 1) % this.state.player_order.length;
-            }
+        console.log("nextStatePostFlop")
+    }
 
-            // The sb might not be in the game any more so we need to find the next player
-            let active_player = null;
-            let i = sb_index;
-            while(active_player == null) {
-                let p_id = this.state.player_order[i % this.state.player_order.length];
-                if(this.state.player_map.get(p_id).inRound) {
-                    active_player = this.state.player_map.get(p_id)
-                } else {
-                    i++;
-                }
-            }
+    private determineWinner() {
+        // If there is a single winner due to folding...
+        if (Array.from(this.state.player_map.values()).filter(player => player.inRound).length == 1) {
+            return Array.from(this.state.player_map.values()).filter(player => player.inRound)[0]
+        }
 
-            active_player.isTurn = true;
-            this.currentPlay = active_player.id;
-    } 
+        return this.state.player_map.get(this.state.player_order[0]);
+    }
 
     private transitionState(nextState: Gamestate) {
-        if(this.gameState == Gamestate.Preround && nextState == Gamestate.Preflop) {
+        if (this.gameState == Gamestate.Preround && nextState == Gamestate.Preflop) {
+
             this.state.running = true;
             // Assign a dealer if there wasn't one already. Otherwise, increment dealer
             let dealer_arr = Array.from(this.state.player_map.values()).filter(player => player.isDealer)
-            if(dealer_arr.length == 0) {
+            if (dealer_arr.length == 0) {
                 this.state.player_map.get(this.state.player_order[0]).isDealer = true;
             } else {
                 let old_dealer_indx = this.state.player_order.indexOf(dealer_arr[0].id);
@@ -122,8 +138,8 @@ export class PokerRoom extends Room<GameState> {
                 let new_idealer_id = this.state.player_order[(old_dealer_indx + 1) % this.state.player_order.length];
                 this.state.player_map.get(new_idealer_id).isDealer = true;
             }
-            
-            for(let [player_id, player] of this.state.player_map.entries()) {
+
+            for (let [player_id, player] of this.state.player_map.entries()) {
                 player.hand.push(this.state.deck.deal());
                 player.hand.push(this.state.deck.deal());
                 player.inRound = true;
@@ -157,28 +173,53 @@ export class PokerRoom extends Room<GameState> {
 
             this.currentBet = 1;
             this.lastRaise = 1;
-            
+
             this.gameState = nextState;
-        } else if(this.gameState == Gamestate.Preflop && nextState == Gamestate.Flop) {
+        } else if (this.gameState == Gamestate.Preflop && nextState == Gamestate.Flop) {
             this.nextStatePostFlop(3);
             this.gameState = nextState;
-        } else if(this.gameState == Gamestate.Flop && nextState == Gamestate.Turn) {
+        } else if (this.gameState == Gamestate.Flop && nextState == Gamestate.Turn) {
             this.nextStatePostFlop(1);
             this.gameState = nextState;
-        } else if(this.gameState == Gamestate.Turn && nextState == Gamestate.River) {
+        } else if (this.gameState == Gamestate.Turn && nextState == Gamestate.River) {
             this.nextStatePostFlop(1);
             this.gameState = nextState;
-        } else if(this.gameState == Gamestate.River && nextState == Gamestate.EndGame) {
-            // TODO: figure out winner and award them the pot
+        } else if (nextState == Gamestate.EndGame) {
+            this.state.winner = this.determineWinner();
+
+            this.state.winner.bb += this.state.pot;
+            this.state.pot = 0;
+            this.state.running = false;
+
+            this.state.player_map.forEach((player) => {
+                player.isTurn = false;
+                player.isReady = false;
+            })
+
+            this.gameState = nextState;
+        } else if (this.gameState == Gamestate.EndGame && nextState == Gamestate.Preflop) {
+            this.gameState = Gamestate.Preround;
             this.reset();
+            this.transitionState(Gamestate.Preflop);
+        } else {
+            throw new Error("INVALID TRANSITION: " + this.gameState + " --> " + nextState);
         }
+
+
+        this.flush();
+        console.log("transitionState")
     }
 
     private reset() {
         this.gameState = Gamestate.Preround;
 
+        for (let id of this.toDelete) {
+            this.deletePlayer(id);
+        }
+        this.toDelete = [];
+
         this.state.player_map.forEach((player) => {
-            player.currentBet = 0; 
+            player.currentBet = 0;
             player.isTurn = false;
             player.inRound = false;
             player.isReady = false;
@@ -192,38 +233,40 @@ export class PokerRoom extends Room<GameState> {
         this.state.board = new ArraySchema<Card>();
         this.state.running = false;
         this.state.deck = new Deck();
+        this.state.winner = null;
 
-        for(let id of this.toDelete) {
-            this.deletePlayer(id);
-        }
-        this.toDelete = [];
+        console.log("reset")
     }
 
     private deletePlayer(id: string) {
-        if(this.state.player_map.get(id).isDealer) {
+        if (this.state.player_map.get(id) && this.state.player_map.get(id).isDealer) {
             let new_dealer_id = this.state.player_order[(this.state.player_order.indexOf(id) - 1 + this.state.player_order.length) % this.state.player_order.length];
             this.state.player_map.get(new_dealer_id).isDealer = true;
         }
         this.state.player_map.delete(id);
-        for(let i = 0; i < this.state.player_order.length; i++) {
-            if(this.state.player_order[i] == id) {
-                this.state.player_order.splice(i, 1);            
+        for (let i = 0; i < this.state.player_order.length; i++) {
+            if (this.state.player_order[i] == id) {
+                this.state.player_order.splice(i, 1);
             }
         }
-    }
 
+        console.log("deletePlayer")
+    }
+  
+    // TODO: on a second game in a lobby, folding moves to the next state instead
     private fold(id: string) {
         let player = this.state.player_map.get(id);
-            this.incrementPlayerTurn(player, true);
-            this.transitionIfNeeded();
-            if(this.currentPlay == id) {
-                this.currentPlay = this.getNextPlayer(player).id;
-            }
+        this.incrementPlayerTurn(player, true);
+        this.transitionIfNeeded();
+        if (this.currentPlay == id) {
+            this.currentPlay = this.getNextPlayer(player).id;
+        }
 
-            if(Array.from(this.state.player_map.values()).filter(player => player.inRound).length == 1) {
-                Array.from(this.state.player_map.values()).filter(player => player.inRound)[0].bb += this.state.pot;
-                this.reset();
-            }
+        if (Array.from(this.state.player_map.values()).filter(player => player.inRound).length == 1) {
+            this.transitionState(Gamestate.EndGame);
+        }
+
+        console.log("fold")
     }
 
     onCreate(options: any) {
@@ -236,11 +279,28 @@ export class PokerRoom extends Room<GameState> {
 
             if (this.allPlayersReady() && this.clients.length > 1) {
                 this.transitionState(Gamestate.Preflop);
+
+                this.state.player_map.forEach((player) => {
+                    console.log(player);
+                    console.log("currentBet: " + player.currentBet);
+                    console.log("isTurn: " + player.isTurn);
+                    console.log("inRound: " + player.inRound);
+                    console.log("isReady: " + player.isReady);
+                    console.log("isDealer: " + player.isDealer);
+                    console.log(player.hand);
+                })
+                
             }
+
+            this.flush();
+            console.log("onMessage::ready")
         });
 
         this.onMessage("fold", (client, message: Fold) => {
             this.fold(client.id);
+
+            this.flush();
+            console.log("onMessage::fold")
         });
         this.onMessage("call", (client, message: Call) => {
             let player = this.state.player_map.get(client.id);
@@ -249,11 +309,14 @@ export class PokerRoom extends Room<GameState> {
             player.currentBet = this.currentBet;
             this.incrementPlayerTurn(player)
             this.transitionIfNeeded();
+
+            this.flush();
+            console.log("onMessage::call")
         });
         this.onMessage("raise", (client, message: Raise) => {
-            if(message.amount < 1) {
+            if (message.amount < 1) {
                 console.log("Bet less than minimum")
-            } else if((message.amount - this.currentBet) * 2 < this.lastRaise) {
+            } else if ((message.amount - this.currentBet) * 2 < this.lastRaise) {
                 console.log("Must raise at least twice the last raise")
             } else {
                 this.lastRaise = message.amount - this.currentBet;
@@ -267,20 +330,26 @@ export class PokerRoom extends Room<GameState> {
                 this.incrementPlayerTurn(player)
                 this.currentPlay = player.id;
             }
+
+            this.flush();
+            console.log("onMessage::raise")
         });
+
+        console.log("onCreate")
     }
 
     onJoin(client: Client, options: any) {
+        console.log("player joining!")
         let player = new Player(client.id, false);
         this.state.player_map.set(client.id, player);
 
         player.bb = 150;  // TODO: set this to the same as the small stack
 
-        if(!this.state.running) {
+        if (!this.state.running) {
             this.state.player_order.push(player.id);
         } else {
-            for(let i = 0; i < this.state.player_order.length; i++) {
-                if(this.state.player_map.get(this.state.player_order[i]).isDealer) {
+            for (let i = 0; i < this.state.player_order.length; i++) {
+                if (this.state.player_map.get(this.state.player_order[i]).isDealer) {
                     // Splice doesn't insert the value on the ArraySchema (although the function exists and doesn't throw an error)
                     // so we create a temporary array instead
                     let t = Array.from(this.state.player_order);
@@ -290,17 +359,39 @@ export class PokerRoom extends Room<GameState> {
             }
             player.inRound = false;
         }
+
+        this.flush();
+        console.log("onJoin")
     }
 
     onLeave(client: Client, consented: boolean) {
-        if(this.state.running) {
+        // Reset the game if only one player will be left
+        if (this.state.player_order.length == 2) {
+            // Reset the game if we were in the end-game menu
+            if (this.gameState == Gamestate.EndGame || this.gameState == Gamestate.Preround) {
+                this.deletePlayer(client.id);
+                this.reset();
+                return;
+            } else {
+                this.toDelete.push(client.id);
+                this.fold(client.id);
+            }
+        } else if (this.state.running) {
             this.toDelete.push(client.id);
             this.fold(client.id);
         } else {
             this.deletePlayer(client.id);
         }
+
+        this.flush();
+        console.log("onLeave")
     }
 
     onDispose() {
+    }
+
+    flush() {
+        this.broadcast("update-state", this.state);
+        console.log("flush")
     }
 }
