@@ -8,6 +8,7 @@
     "build:backend": "tsc -p tsconfig.json",
     "start:frontend": "parcel frontend/index.html",
     "build:frontend": "parcel build frontend/index.html",
+    "test": "jest --coverage",
     "clean": "rimraf ./dist ./app",
     "start": "concurrently --kill-others-on-fail --handle-input \"npm run start:backend\" \"npm run start:frontend\"",
     "bundle": "npm run clean && npm run build:backend && npm run build:frontend && ncp dist/ app/public"
@@ -20,12 +21,14 @@
   "devDependencies": {
     "@types/cors": "2.8.6",
     "@types/express": "4.17.6",
+    "@types/jest": "^27.4.1",
     "concurrently": "5.3.0",
     "jest": "^27.5.1",
     "ncp": "^2.0.0",
     "nodemon": "2.0.4",
     "parcel": "1.12.4",
     "rimraf": "^3.0.2",
+    "ts-jest": "^27.1.4",
     "ts-node": "8.10.2",
     "typescript": "3.9.5"
   },

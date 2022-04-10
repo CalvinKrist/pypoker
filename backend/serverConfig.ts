@@ -2,7 +2,6 @@ import http from "http";
 import express from "express";
 import cors from "cors";
 import {Server} from "colyseus";
-import {gameServer} from "./serverConfig";
 import {monitor} from "@colyseus/monitor";
 
 import {PokerRoom} from "./PokerRoom";
@@ -19,11 +18,11 @@ app.use(cors());
 app.use(express.json())
 
 const server = http.createServer(app);
+const gameServer = new Server({
+    server,
+});
 
-// register colyseus monitor AFTER registering your room handlers
-app.use("/colyseus", monitor());
-
-gameServer.listen(port);
-console.log(`Listening on ws://localhost:${port}`)
+// register our PokerRoom
+gameServer.define('poker', PokerRoom);
 
 export {gameServer};
