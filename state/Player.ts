@@ -27,6 +27,12 @@ export class Player extends Schema  {
     @type([Card])
     hand: Card[];
 
+    @type([Card])
+    bestHand: Card[];
+
+    @type("boolean")
+    shouldShowHand: boolean;
+
     constructor(id: string, ready: boolean) {
         super();
 
@@ -38,6 +44,8 @@ export class Player extends Schema  {
         this.bb = 0;
         this.inRound = false;
         this.currentBet = 0;
+        this.bestHand = new ArraySchema<Card>();
+        this.shouldShowHand = false;
     }
 
     public get isReady(): boolean {

@@ -6,6 +6,7 @@ import poker_chip from './assets/poker_chip.png';
 import { READY } from "../messages/readystate";
 import PubSub from 'pubsub-js'
 import { FOLD, CALL, raise } from "../messages/playeraction";
+import { Card } from '../state/Card';
 
 export let game;
 export let renderer;
@@ -200,9 +201,10 @@ class UserSprite extends Phaser.GameObjects.Container {
                 this.card2.y = -y_offset;
                 this.card1.x = -this.card1.width * this.card1.scale * 0.6;
                 this.card2.x = this.card2.width * this.card2.scale * 0.6;
-            } else {
+            } else if (!player.shouldShowHand){
                 this.card1 = scene.add.sprite(0, (this.active_user_sprite.displayHeight + 18) * (newOrrientation * 2 - 1), "card_back").setOrigin(0.5);
                 this.card2 = scene.add.sprite(0, (this.active_user_sprite.displayHeight + 23) * (newOrrientation * 2 - 1), "card_back").setOrigin(0.5);
+                
                 this.add(this.card1);
                 this.add(this.card2);
                 this.card1.displayWidth = gameOptions.cardWidth * gameOptions.cardScale * 0.8;
@@ -212,6 +214,18 @@ class UserSprite extends Phaser.GameObjects.Container {
                 this.card2.displayWidth = gameOptions.cardWidth * gameOptions.cardScale * 0.8;
                 this.card2.displayHeight = gameOptions.cardHeight * gameOptions.cardScale * 0.8;
                 this.card2.x += this.card2.displayWidth * 0.05;
+            } else {
+                this.card1 = scene.createCard(hand[0].suit, hand[0].value);
+                this.card2 = scene.createCard(hand[1].suit, hand[1].value);
+            
+                this.add(this.card1);
+                this.add(this.card2);
+
+                let y_offset = this.card2.height * this.card2.scale * 1.1;
+                this.card1.y = (newOrrientation * 2 - 1)* y_offset;
+                this.card2.y = (newOrrientation * 2 - 1) * y_offset;
+                this.card1.x = -this.card1.width * this.card1.scale * 0.6;
+                this.card2.x = this.card2.width * this.card2.scale * 0.6;
             }
         }
 
@@ -295,12 +309,10 @@ class PlayGame extends Phaser.Scene {
                 this.pot_size.x = pot_size_x_anchor + this.pot_size.displayWidth;
             }
         });
-        PubSub.subscribe('winner', (_, change) => {
-            if (change.previousValue != change.value) {
-                if(change.value != null && typeof change.value.id !== 'undefined') {
-                    this.pot_size.setVisible(false);
-                } 
-            }
+        PubSub.subscribe('num-winners', (_, change) => {
+            if(this.state.winners["$items"].length > 0) {
+                this.pot_size.setVisible(false);
+            } 
         });
 
         this.dealerChit = new DealerChit(this, 0, 0);
@@ -357,7 +369,7 @@ class PlayGame extends Phaser.Scene {
             this.bet_submit_btn.visible = visible;
         });
 
-        PubSub.subscribe('player-change', (_, __) => {
+        PubSub.subscribe('state-change', (_, __) => {
             for(let player_sprite of player_sprites) {
                 player_sprite.setVisible(false);
             }
@@ -380,7 +392,7 @@ class PlayGame extends Phaser.Scene {
             }
 
             // Create player actions
-            if ((this.state.winner == null || typeof this.state.winner.id == 'undefined') && this.state.running && players.get(this.userId).isTurn) {
+            if (this.state.winners["$items"].length == 0 && this.state.running && players.get(this.userId).isTurn) {
                 this.fold.setVisible(true);
                 this.call.setVisible(true);
                 this.raise_btn.setVisible(true);
@@ -393,8 +405,8 @@ class PlayGame extends Phaser.Scene {
                 this.bet_submit_btn.setVisible(false);
             }
         })
-        PubSub.publishSync('player-change', {});
 
+        // TODO: when the window is resized mid-game, this becomes visible under the river
         this.startbutton = this.drawButton("BEGIN", screenCenterX, screenCenterY, () => {
             this.room.send("ready", READY);
             this.waiting_message.visible = true;
@@ -415,22 +427,24 @@ class PlayGame extends Phaser.Scene {
                 }
             }
         });
-        PubSub.subscribe('winner', (_, change) => {
-            if (change.previousValue != change.value) {
-                if(change.value != null && typeof change.value.id !== 'undefined') {
-                    this.startbutton.setVisible(true);
-                    this.startbutton.setText("NEXT HAND");
-                    this.children.bringToTop(this.startbutton);
-                }
+        
+        PubSub.subscribe('num-winners', (_, __) => {
+            if(this.state.winners["$items"].length > 0) {
+                this.startbutton.setVisible(true);
+                this.startbutton.setText("NEXT HAND");
+                this.children.bringToTop(this.startbutton);
             }
         });
 
         // Draw the river
+        // TODO: when the river is visible and a window is resized, the 
+        // old river is not deleted even when the new one is drawn
         let board_sprites = [];
         let update_board = () => {
             for (let card of board_sprites) {
                 card.destroy();
             }
+            board_sprites = []
 
             let board = Array.from(this.state.board)
             if (board.length > 0) {
@@ -448,12 +462,9 @@ class PlayGame extends Phaser.Scene {
                 }
             }
         }        
-        this.room.state.board.onAdd = (c1, c2) => {
+        PubSub.subscribe("num-board", (_) => {
             update_board();
-        }
-        this.room.state.board.onRemove = (c1, c2) => {
-            update_board();
-        }
+        })
 
         // Draw the winner
         this.winner_text = this.add.text(screenCenterX, screenCenterY * .7, '', {
@@ -467,22 +478,24 @@ class PlayGame extends Phaser.Scene {
         }).setOrigin(0.5).setVisible(false);
         // The value is filled in, even when it's null for the server -- 
         // but it's primitive children can be undefined
-        if(this.state.winner != null && typeof this.state.winner.id !== 'undefined') {
+        if(this.state.winningMessage != null) {
             this.winner_text.setVisible(true);
-            this.winner_text.setText('Winner: ' + this.state.winner.id);
+            this.winner_text.setText(this.state.winningMessage);
         }
-        PubSub.subscribe('winner', (_, change) => {
-            if (change.previousValue != change.value) {
-                if(change.value != null && typeof change.value.id !== 'undefined') {
-                    this.winner_text.setVisible(true);
-                    this.winner_text.setText('Winner: ' + change.value.id);
-                } else {
-                    this.winner_text.setVisible(false);
-                }
-
+        PubSub.subscribe('state-change', (_, __) => {
+            if(this.state.winningMessage) {
+                this.winner_text.setVisible(true);
+                this.winner_text.setText(this.state.winningMessage);
                 this.children.bringToTop(this.winner_text);
+            } else {
+                this.winner_text.setVisible(false);
             }
         });
+
+        // Trigger some events immediatly so we display the correct values
+        PubSub.publishSync('state-change', {});
+        PubSub.publishSync('num-board', {});
+        PubSub.publishSync('num-winners', {});
 
     } // end of create function
 
@@ -504,8 +517,26 @@ class PlayGame extends Phaser.Scene {
     }
 
     updateState(gameState) {
+        let old_num_winners = 0;
+        if(this.state && this.state.winners) {
+            old_num_winners = this.state.winners.length;
+        }
+
+        let old_num_board = 0;
+        if(this.state && this.state.board) {
+            old_num_board = this.state.board.length;
+        }
+
         this.state = gameState;
-        PubSub.publishSync('player-change', this.state);
+        PubSub.publishSync('state-change', this.state);
+
+        if(this.state.winners["$items"].length != old_num_winners) {
+            PubSub.publishSync('num-winners', {});
+        }
+
+        if(this.state.board["$items"].length != old_num_board) {
+            PubSub.publishSync('num-board', {});
+        }
     }
 
     onStateChanges(changes) {

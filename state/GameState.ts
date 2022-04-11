@@ -22,8 +22,11 @@ export class GameState extends Schema {
     @type("number")
     pot: number;
 
-    @type(Player)
-    winner: Player;
+    @type([Player])
+    winners: Player[];
+
+    @type("string")
+    winningMessage: string;
 
     constructor() {
         super();
@@ -33,7 +36,8 @@ export class GameState extends Schema {
         this.player_order = new ArraySchema<string>();
         this.pot = 0;
         this.board = new ArraySchema<Card>();
-        this.winner = null;
+        this.winners = new ArraySchema<Player>();
+        this.winningMessage = null;
     }
 
 }

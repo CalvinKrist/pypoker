@@ -1,9 +1,9 @@
-import { getPairs, getHighCard, getSet, getStraight, getFlush, getFullHouse, getFourOfAKind, compareHand, HandType, getUniqueHighCard } from "../backend/HandComparer";
+import { getPairs, getHighCard, getSet, getStraight, getFlush, getFullHouse, getFourOfAKind, compareHand, HandType, getUniqueHighCard, getPlayersBestHand } from "../backend/HandComparer";
 import { Card } from "../state/Card"
 
 describe("testing your Colyseus app", () => {
-    
-    it("getPairs returns empty array when no pairs", async() => {
+
+    it("getPairs returns empty array when no pairs", async () => {
         let hand = [];
 
         hand.push(new Card(2, 0));
@@ -15,7 +15,7 @@ describe("testing your Colyseus app", () => {
         expect(getPairs(hand)).toEqual([]);
     });
 
-    it("getPairs returns all pairs in reverse order of size", async() => {
+    it("getPairs returns all pairs in reverse order of size", async () => {
         let hand1 = [];
 
         hand1.push(new Card(2, 0));
@@ -37,7 +37,7 @@ describe("testing your Colyseus app", () => {
         expect(getPairs(hand2)).toEqual([5, 2]);
     });
 
-    it("getPairs returns [] for sets", async() => {
+    it("getPairs returns [] for sets", async () => {
         let hand1 = [];
 
         hand1.push(new Card(2, 0));
@@ -49,7 +49,7 @@ describe("testing your Colyseus app", () => {
         expect(getPairs(hand1)).toEqual([]);
     });
 
-    it("getHighCard returns cards in order of size", async() => {
+    it("getHighCard returns cards in order of size", async () => {
         let hand1 = [];
 
         hand1.push(new Card(1, 0));
@@ -61,7 +61,7 @@ describe("testing your Colyseus app", () => {
         expect(getHighCard(hand1)).toEqual([6, 5, 4, 2, 1]);
     });
 
-    it("getUniqueHighCard returns only unique high cards", async() => {
+    it("getUniqueHighCard returns only unique high cards", async () => {
         let hand1 = [];
 
         hand1.push(new Card(1, 0));
@@ -73,7 +73,7 @@ describe("testing your Colyseus app", () => {
         expect(getUniqueHighCard(hand1)).toEqual([4, 2, 1]);
     });
 
-    it("getSet returns null when there's no set", async() => {
+    it("getSet returns null when there's no set", async () => {
         let hand1 = [];
 
         hand1.push(new Card(1, 0));
@@ -85,7 +85,7 @@ describe("testing your Colyseus app", () => {
         expect(getSet(hand1)).toEqual(null);
     });
 
-    it("getSet returns a set", async() => {
+    it("getSet returns a set", async () => {
         let hand1 = [];
 
         hand1.push(new Card(1, 0));
@@ -97,7 +97,7 @@ describe("testing your Colyseus app", () => {
         expect(getSet(hand1)).toEqual(4);
     });
 
-    it("getStraight returns null when there's no straight", async() => {
+    it("getStraight returns null when there's no straight", async () => {
         let hand1 = [];
 
         hand1.push(new Card(1, 0));
@@ -119,7 +119,7 @@ describe("testing your Colyseus app", () => {
         expect(getStraight(hand1)).toEqual(null);
     });
 
-    it("getStraight works even when the card range is 4 and there is no straight", async() => {
+    it("getStraight works even when the card range is 4 and there is no straight", async () => {
         let hand1 = [];
 
         hand1.push(new Card(2, 0));
@@ -131,7 +131,7 @@ describe("testing your Colyseus app", () => {
         expect(getStraight(hand1)).toEqual(null);
     });
 
-    it("getStraight returns the hightest value of a straight", async() => {
+    it("getStraight returns the hightest value of a straight", async () => {
         let hand1 = [];
 
         hand1.push(new Card(3, 0));
@@ -162,7 +162,7 @@ describe("testing your Colyseus app", () => {
         expect(getStraight(hand1)).toEqual(12);
     })
 
-    it("getStraight works with aces", async() => {
+    it("getStraight works with aces", async () => {
         let hand1 = [];
 
         hand1.push(new Card(14, 0));
@@ -184,7 +184,7 @@ describe("testing your Colyseus app", () => {
         expect(getStraight(hand1)).toEqual(5);
     })
 
-    it("getFlush detects a lack of suit", async() => {
+    it("getFlush detects a lack of suit", async () => {
         let hand1 = [];
 
         hand1.push(new Card(14, 0));
@@ -196,7 +196,7 @@ describe("testing your Colyseus app", () => {
         expect(getFlush(hand1)).toEqual(false);
     })
 
-    it("getFlush detects a suit", async() => {
+    it("getFlush detects a suit", async () => {
         let hand1 = [];
 
         hand1.push(new Card(14, 2));
@@ -208,7 +208,7 @@ describe("testing your Colyseus app", () => {
         expect(getFlush(hand1)).toEqual(true);
     })
 
-    it("getFlush detects a suit", async() => {
+    it("getFlush detects a suit", async () => {
         let hand1 = [];
 
         hand1.push(new Card(14, 2));
@@ -220,7 +220,7 @@ describe("testing your Colyseus app", () => {
         expect(getFlush(hand1)).toEqual(true);
     })
 
-    it("getFullHouse returns [set, pair]", async() => {
+    it("getFullHouse returns [set, pair]", async () => {
         let hand1 = [];
 
         hand1.push(new Card(2, 2));
@@ -242,7 +242,7 @@ describe("testing your Colyseus app", () => {
         expect(getFullHouse(hand1)).toEqual([5, 4]);
     })
 
-    it("getFullHouse returns [] when there's no full house", async() => {
+    it("getFullHouse returns [] when there's no full house", async () => {
         let hand1 = [];
 
         hand1.push(new Card(2, 2));
@@ -264,7 +264,7 @@ describe("testing your Colyseus app", () => {
         expect(getFullHouse(hand1)).toEqual([]);
     })
 
-    it("getFourOfAKind returns null when there's no four of a kind", async() => {
+    it("getFourOfAKind returns null when there's no four of a kind", async () => {
         let hand1 = [];
 
         hand1.push(new Card(1, 0));
@@ -276,7 +276,7 @@ describe("testing your Colyseus app", () => {
         expect(getFourOfAKind(hand1)).toEqual(null);
     });
 
-    it("getFourOfAKind returns the correct value", async() => {
+    it("getFourOfAKind returns the correct value", async () => {
         let hand1 = [];
 
         hand1.push(new Card(12, 0));
@@ -288,7 +288,7 @@ describe("testing your Colyseus app", () => {
         expect(getFourOfAKind(hand1)).toEqual(12);
     });
 
-    it("compareHand works for straight flushes", async() => {
+    it("compareHand works for straight flushes", async () => {
         let hand1 = [];
         hand1.push(new Card(12, 0));
         hand1.push(new Card(11, 0));
@@ -333,7 +333,7 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.StraightFlush]);
     });
 
-    it("compareHand works for four of a kinds", async() => {
+    it("compareHand works for four of a kinds", async () => {
         let hand1 = [];
         hand1.push(new Card(8, 0));
         hand1.push(new Card(8, 0));
@@ -376,7 +376,7 @@ describe("testing your Colyseus app", () => {
 
         expect(compareHand(hand1, hand2)).toEqual([1, HandType.FourOfAKind]);
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.FourOfAKind]);
-        
+
         // Verify that high card beats ties
         hand1 = [];
         hand1.push(new Card(8, 0));
@@ -395,7 +395,7 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.FourOfAKind, HandType.HighCard]);
     });
 
-    it("compareHand works for full house", async() => {
+    it("compareHand works for full house", async () => {
         let hand1 = [];
         hand1.push(new Card(2, 0));
         hand1.push(new Card(2, 0));
@@ -460,7 +460,7 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.FullHouse]);
     });
 
-    it("compareHand works for flush", async() => {
+    it("compareHand works for flush", async () => {
         let hand1 = [];
         hand1.push(new Card(2, 0));
         hand1.push(new Card(3, 0));
@@ -507,7 +507,7 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.Flush]);
     });
 
-    it("compareHand works for straights", async() => {
+    it("compareHand works for straights", async () => {
         let hand1 = [];
         hand1.push(new Card(2, 0));
         hand1.push(new Card(3, 2));
@@ -554,7 +554,7 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.Straight]);
     });
 
-    it("compareHand works for sets", async() => {
+    it("compareHand works for sets", async () => {
         let hand1 = [];
         hand1.push(new Card(2, 0));
         hand1.push(new Card(4, 2));
@@ -619,7 +619,7 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.Set]);
     });
 
-    it("compareHand works for two pair", async() => {
+    it("compareHand works for two pair", async () => {
         let hand1 = [];
         hand1.push(new Card(2, 0));
         hand1.push(new Card(2, 2));
@@ -701,7 +701,7 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.TwoPair]);
     });
 
-    it("compareHand works for pair", async() => {
+    it("compareHand works for pair", async () => {
         let hand1 = [];
         hand1.push(new Card(2, 0));
         hand1.push(new Card(2, 2));
@@ -766,7 +766,7 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand2, hand1)).toEqual([-1, HandType.Pair]);
     });
 
-    it("compareHand works for high card", async() => {
+    it("compareHand works for high card", async () => {
         let hand1 = [];
         hand1.push(new Card(2, 0));
         hand1.push(new Card(3, 2));
@@ -811,4 +811,74 @@ describe("testing your Colyseus app", () => {
         expect(compareHand(hand1, hand2)).toEqual([-1, HandType.HighCard]);
         expect(compareHand(hand2, hand1)).toEqual([1, HandType.HighCard]);
     });
-  });
+
+    it("getPlayersBestHand finds a player's best hand", async () => {
+        let hand = [];
+        hand.push(new Card(2, 0));
+        hand.push(new Card(3, 2));
+
+        let board = [];
+        board.push(new Card(2, 0));
+        board.push(new Card(3, 2));
+        board.push(new Card(7, 0));
+        board.push(new Card(8, 4));
+        board.push(new Card(11, 0));
+
+        let bestHand = [];
+        bestHand.push(new Card(2, 0));
+        bestHand.push(new Card(3, 2));
+        bestHand.push(new Card(2, 0));
+        bestHand.push(new Card(3, 2));
+        bestHand.push(new Card(11, 0));
+
+        let handSorter = (a: Card, b: Card) => a.suit * 13 + a.value - b.suit * 13 - b.value;
+        bestHand.sort(handSorter);
+
+        expect(getPlayersBestHand(hand, board).sort(handSorter)).toEqual(bestHand);
+
+        hand = [];
+        hand.push(new Card(2, 0));
+        hand.push(new Card(3, 2));
+
+        board = [];
+        board.push(new Card(3, 0));
+        board.push(new Card(3, 2));
+        board.push(new Card(7, 0));
+        board.push(new Card(8, 4));
+        board.push(new Card(11, 0));
+
+        bestHand = [];
+        bestHand.push(new Card(3, 0));
+        bestHand.push(new Card(3, 2));
+        bestHand.push(new Card(3, 2));
+        bestHand.push(new Card(8, 4));
+        bestHand.push(new Card(11, 0));
+
+        bestHand.sort(handSorter);
+
+        expect(getPlayersBestHand(hand, board).sort(handSorter)).toEqual(bestHand);
+
+        hand = [];
+        hand.push(new Card(7, 0));
+        hand.push(new Card(9, 2));
+
+        board = [];
+        board.push(new Card(3, 0));
+        board.push(new Card(6, 2));
+        board.push(new Card(8, 0));
+        board.push(new Card(10, 4));
+        board.push(new Card(14, 0));
+
+        bestHand = [];
+        bestHand.push(new Card(6, 2));
+        bestHand.push(new Card(7, 0));
+        bestHand.push(new Card(8, 0));
+        bestHand.push(new Card(9, 2));
+        bestHand.push(new Card(10, 4));
+
+        bestHand.sort(handSorter);
+
+        expect(getPlayersBestHand(hand, board).sort(handSorter)).toEqual(bestHand);
+    });
+
+});

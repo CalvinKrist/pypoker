@@ -5,7 +5,24 @@ import { ArraySchema } from "@colyseus/schema";
 import { ReadyState } from "../messages/readystate";
 import { Fold, Call, Raise } from "../messages/playeraction";
 import { Deck } from "../state/Deck";
+import * as HandComparer from "./HandComparer";
 import { Card } from "../state/Card";
+
+class WinnerInfo {
+    winners: Player[]
+    winningMessage: string
+
+    constructor(winners: Player[], comparison: number[]) {
+        this.winners = winners;
+        this.winningMessage = "Congratulations " + winners[0].id;
+
+        for(let i = 1; i < winners.length; i++) {
+            this.winningMessage += " and " + winners[i].id;
+        }
+
+        this.winningMessage += "!";
+    }
+}
 
 export enum Gamestate {
     Preround,  // round hasn't started yet
@@ -51,6 +68,10 @@ export class PokerRoom extends Room<GameState> {
     private getCurrentPlayer() {
         let id = Array.from(this.state.player_order).filter(id => this.state.player_map.get(id).isTurn)[0];
         return this.state.player_map.get(id);
+    }
+
+    private numPlayersInRound() {
+        return Array.from(this.state.player_map.values()).filter(player => player.inRound).length;
     }
 
     private incrementPlayerTurn(player: Player, leaveRound: boolean = false) {
@@ -115,15 +136,30 @@ export class PokerRoom extends Room<GameState> {
         //console.log("nextStatePostFlop")
     }
 
-    private determineWinner() {
+    private determineWinners() {
         // If there is a single winner due to folding...
-        if (Array.from(this.state.player_map.values()).filter(player => player.inRound).length == 1) {
-            return Array.from(this.state.player_map.values()).filter(player => player.inRound)[0]
+        if (this.numPlayersInRound() == 1) {
+            return new WinnerInfo([Array.from(this.state.player_map.values()).filter(player => player.inRound)[0]], []);
         }
 
-        
+        let remainingPlayers = Array.from(this.state.player_map.values()).filter(player => player.inRound);
+        for(let player of remainingPlayers) {
+            player.bestHand = HandComparer.getPlayersBestHand(player.hand, this.state.board);
+        }
 
-        return this.state.player_map.get(this.state.player_order[0]);
+        let winningPlayers = [remainingPlayers[0]];
+        let winningComparison = null;
+        for(let i = 1; i < remainingPlayers.length; i++) {
+            let comparison = HandComparer.compareHand(remainingPlayers[i].bestHand, winningPlayers[0].bestHand)
+            if(comparison[0] == 1) {
+                winningPlayers = [remainingPlayers[i]];
+                winningComparison = comparison;
+            } else if(comparison[0] == 0) {
+                winningPlayers.push(remainingPlayers[i]);
+            }
+        }
+
+        return new WinnerInfo(winningPlayers, winningComparison);
     }
 
     private transitionState(nextState: Gamestate) {
@@ -187,13 +223,22 @@ export class PokerRoom extends Room<GameState> {
             this.nextStatePostFlop(1);
             this.gameState = nextState;
         } else if (nextState == Gamestate.EndGame) {
-            this.state.winner = this.determineWinner();
+            let gameResults = this.determineWinners();
+            this.state.winners = gameResults.winners;
+            this.state.winningMessage = gameResults.winningMessage;
 
-            this.state.winner.bb += this.state.pot;
+            for(let player of gameResults.winners) {
+                player.bb += this.state.pot / gameResults.winners.length;
+            }
+
             this.state.pot = 0;
             this.state.running = false;
 
             this.state.player_map.forEach((player) => {
+                if(this.gameState == Gamestate.River && this.numPlayersInRound() > 1) {
+                    player.shouldShowHand = true;
+                }
+
                 player.isTurn = false;
                 player.isReady = false;
             })
@@ -226,6 +271,8 @@ export class PokerRoom extends Room<GameState> {
             player.inRound = false;
             player.isReady = false;
             player.hand = [];
+            player.bestHand = [];
+            player.shouldShowHand = false;
         })
 
         this.currentPlay = "";
@@ -235,7 +282,8 @@ export class PokerRoom extends Room<GameState> {
         this.state.board = new ArraySchema<Card>();
         this.state.running = false;
         this.state.deck = new Deck();
-        this.state.winner = null;
+        this.state.winners = [];
+        this.state.winningMessage = null;
 
         //console.log("reset")
     }
@@ -264,7 +312,7 @@ export class PokerRoom extends Room<GameState> {
             this.currentPlay = this.getNextPlayer(player).id;
         }
 
-        if (Array.from(this.state.player_map.values()).filter(player => player.inRound).length == 1) {
+        if (this.numPlayersInRound() == 1) {
             this.transitionState(Gamestate.EndGame);
         }
         //console.log("fold")
