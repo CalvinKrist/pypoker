@@ -9,17 +9,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderer.scenes[0].setUserId(room.sessionId);
     renderer.scenes[0].setRoom(room);
 
-    room.onStateChange((newState: GameState) => {
-        //console.log(newState);
-        //renderer.scenes[0].updateState(newState);
-    });
     room.state.onChange = (changes) => {
         renderer.scenes[0].onStateChanges(changes);
     };
 
-    room.onMessage("update-state", (state) => {
-        state.player_map = new Map(Object.entries(state.player_map))
-        renderer.scenes[0].updateState(state);        
+    room.onMessage("state-update", (newState) => {
+        newState.player_map = new Map(Object.entries(newState.player_map));
+        newState.player_map["$items"] = newState.player_map;
+        newState.player_order["$items"] = newState.player_order;
+        newState.board["$items"] = newState.board;
+
+        for(let player of newState.player_map.values()) {
+            player.hand["$items"] = player.hand;
+        }
+
+        renderer.scenes[0].updateState(newState);
     });
 
 });

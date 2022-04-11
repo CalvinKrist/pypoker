@@ -7,7 +7,7 @@ import { Fold, Call, Raise } from "../messages/playeraction";
 import { Deck } from "../state/Deck";
 import { Card } from "../state/Card";
 
-enum Gamestate {
+export enum Gamestate {
     Preround,  // round hasn't started yet
     Preflop,
     Flop,
@@ -62,7 +62,7 @@ export class PokerRoom extends Room<GameState> {
             player.inRound = false;
         }
 
-        console.log("incrementPlayerTurn")
+        //console.log("incrementPlayerTurn")
     }
 
     private transitionIfNeeded() {
@@ -77,7 +77,7 @@ export class PokerRoom extends Room<GameState> {
                 this.transitionState(Gamestate.EndGame);
             }
         }
-        console.log("transitionIfNeeded")
+        //console.log("transitionIfNeeded")
     }
 
     private nextStatePostFlop(numCardsToDeal: number) {
@@ -112,7 +112,7 @@ export class PokerRoom extends Room<GameState> {
         active_player.isTurn = true;
         this.currentPlay = active_player.id;
 
-        console.log("nextStatePostFlop")
+        //console.log("nextStatePostFlop")
     }
 
     private determineWinner() {
@@ -207,7 +207,7 @@ export class PokerRoom extends Room<GameState> {
 
 
         this.flush();
-        console.log("transitionState")
+        //console.log("transitionState")
     }
 
     private reset() {
@@ -235,7 +235,7 @@ export class PokerRoom extends Room<GameState> {
         this.state.deck = new Deck();
         this.state.winner = null;
 
-        console.log("reset")
+        //console.log("reset")
     }
 
     private deletePlayer(id: string) {
@@ -250,7 +250,7 @@ export class PokerRoom extends Room<GameState> {
             }
         }
 
-        console.log("deletePlayer")
+        //console.log("deletePlayer")
     }
   
     // TODO: on a second game in a lobby, folding moves to the next state instead
@@ -265,8 +265,7 @@ export class PokerRoom extends Room<GameState> {
         if (Array.from(this.state.player_map.values()).filter(player => player.inRound).length == 1) {
             this.transitionState(Gamestate.EndGame);
         }
-
-        console.log("fold")
+        //console.log("fold")
     }
 
     onCreate(options: any) {
@@ -279,28 +278,17 @@ export class PokerRoom extends Room<GameState> {
 
             if (this.allPlayersReady() && this.clients.length > 1) {
                 this.transitionState(Gamestate.Preflop);
-
-                this.state.player_map.forEach((player) => {
-                    console.log(player);
-                    console.log("currentBet: " + player.currentBet);
-                    console.log("isTurn: " + player.isTurn);
-                    console.log("inRound: " + player.inRound);
-                    console.log("isReady: " + player.isReady);
-                    console.log("isDealer: " + player.isDealer);
-                    console.log(player.hand);
-                })
-                
             }
 
             this.flush();
-            console.log("onMessage::ready")
+            //console.log("onMessage::ready")
         });
 
         this.onMessage("fold", (client, message: Fold) => {
             this.fold(client.id);
 
             this.flush();
-            console.log("onMessage::fold")
+            //console.log("onMessage::fold")
         });
         this.onMessage("call", (client, message: Call) => {
             let player = this.state.player_map.get(client.id);
@@ -311,13 +299,13 @@ export class PokerRoom extends Room<GameState> {
             this.transitionIfNeeded();
 
             this.flush();
-            console.log("onMessage::call")
+            //console.log("onMessage::call")
         });
         this.onMessage("raise", (client, message: Raise) => {
             if (message.amount < 1) {
-                console.log("Bet less than minimum")
+                //console.log("Bet less than minimum")
             } else if ((message.amount - this.currentBet) * 2 < this.lastRaise) {
-                console.log("Must raise at least twice the last raise")
+                //console.log("Must raise at least twice the last raise")
             } else {
                 this.lastRaise = message.amount - this.currentBet;
                 this.currentBet = message.amount;
@@ -332,14 +320,14 @@ export class PokerRoom extends Room<GameState> {
             }
 
             this.flush();
-            console.log("onMessage::raise")
+            //console.log("onMessage::raise")
         });
 
-        console.log("onCreate")
+        //console.log("onCreate")
     }
 
     onJoin(client: Client, options: any) {
-        console.log("player joining!")
+        //console.log("player joining!")
         let player = new Player(client.id, false);
         this.state.player_map.set(client.id, player);
 
@@ -361,7 +349,7 @@ export class PokerRoom extends Room<GameState> {
         }
 
         this.flush();
-        console.log("onJoin")
+        //console.log("onJoin")
     }
 
     onLeave(client: Client, consented: boolean) {
@@ -384,14 +372,17 @@ export class PokerRoom extends Room<GameState> {
         }
 
         this.flush();
-        console.log("onLeave")
+        //console.log("onLeave")
     }
 
     onDispose() {
     }
 
+    // Sometimes the game isn't updating the state correctly 
+    // after changes, so we need to manually broadcast them
     flush() {
-        this.broadcast("update-state", this.state);
-        console.log("flush")
+        this.broadcastPatch();
+        this.broadcast("state-update", this.state);
+        //console.log("flush")
     }
 }
