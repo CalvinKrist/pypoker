@@ -402,6 +402,7 @@ export class PokerRoom extends Room<GameState> {
         //console.log("onJoin")
     }
 
+    // TODO: if everyone but the current player leaves the game doesn't instantly end
     onLeave(client: Client, consented: boolean) {
         // Reset the game if only one player will be left
         if (this.state.player_order.length == 2) {
@@ -414,9 +415,14 @@ export class PokerRoom extends Room<GameState> {
                 this.toDelete.push(client.id);
                 this.fold(client.id);
             }
-        } else if (this.state.running) {
+        } else if (this.state.running && this.state.player_map.get(client.id).inRound) {
             this.toDelete.push(client.id);
-            this.fold(client.id);
+
+            if(this.state.player_map.get(client.id).isTurn) {
+                this.fold(client.id);
+            } else {
+                this.state.player_map.get(client.id).inRound = false;
+            }
         } else {
             this.deletePlayer(client.id);
         }

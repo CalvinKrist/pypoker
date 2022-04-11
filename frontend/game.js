@@ -25,7 +25,7 @@ let gameOptions = {
     // card height, in pixels
     cardHeight: 440,
 
-    cardScale: 0.3
+    cardScale: 0.20
 }
 window.onload = function () {
     let gameConfig = {
@@ -77,6 +77,43 @@ class DealerChit extends Phaser.GameObjects.Container {
     }
 }
 
+class CardBase extends Phaser.GameObjects.Container {
+    constructor(scene, card, shadow) {
+        super(scene, 0, 0);
+        scene.children.add(this);
+
+        this.card = card;
+        this.shadow = shadow;
+
+        this.card.setOrigin(0.5);
+        this.shadow.setOrigin(0.5);
+        this.card.setPosition(0, 0);
+        this.shadow.setPosition(0, 0);
+
+        this.shadow.x = -3;
+        this.shadow.y = 2;
+        this.shadow.scale = this.card.scale;
+        this.shadow.tint = 0x000000;
+        this.shadow.alpha = 0.6;
+        this.shadow.angle = this.card.angle;
+
+        this.add(this.card);
+        this.add(this.shadow);
+        this.bringToTop(this.card);
+    }
+}
+
+class CardSprite extends CardBase {
+    constructor(scene, suit, value) {
+        super(scene, scene.createCard(suit, value), scene.createCard(suit, value));
+    }
+}
+
+class CardBackSprite extends CardBase {
+    constructor(scene) {
+        super(scene, scene.add.sprite(0, 0, "card_back").setScale(gameOptions.cardScale * 0.64), scene.add.sprite(0, 0, "card_back").setScale(gameOptions.cardScale * 0.64));
+    }
+}
 
 const ABOVE = 0;
 const BELOW = 1;
@@ -105,7 +142,7 @@ class UserSprite extends Phaser.GameObjects.Container {
         this.add(this.active_user_sprite);
         this.add(this.inactive_user_sprite);
 
-        this.name = scene.add.text(0, this.active_user_sprite.getTopCenter().y - 8, name_str, {
+        this.name = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 6, name_str, {
             fontFamily: 'Quicksand',
             fontSize: '16px',
             color: '#000',
@@ -113,7 +150,7 @@ class UserSprite extends Phaser.GameObjects.Container {
         }).setOrigin(0.5);
         this.add(this.name);
 
-        this.num_chips_label = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 8, bb + " bb", {
+        this.num_chips_label = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 28, bb + " bb", {
             fontFamily: 'Quicksand',
             fontSize: '16px',
             color: '#000',
@@ -189,44 +226,26 @@ class UserSprite extends Phaser.GameObjects.Container {
 
         let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
 
-        if (hand.length > 1) {
+        if (hand.length > 1 && player.inRound) {
             if (player.id == this.userId) {
-                this.card1 = scene.createCard(hand[0].suit, hand[0].value);
-                this.card2 = scene.createCard(hand[1].suit, hand[1].value);
-                this.add(this.card1);
-                this.add(this.card2);
-
-                let y_offset = this.card2.height * this.card2.scale * 1.1;
-                this.card1.y = -y_offset;
-                this.card2.y = -y_offset;
-                this.card1.x = -this.card1.width * this.card1.scale * 0.6;
-                this.card2.x = this.card2.width * this.card2.scale * 0.6;
-            } else if (!player.shouldShowHand){
-                this.card1 = scene.add.sprite(0, (this.active_user_sprite.displayHeight + 18) * (newOrrientation * 2 - 1), "card_back").setOrigin(0.5);
-                this.card2 = scene.add.sprite(0, (this.active_user_sprite.displayHeight + 23) * (newOrrientation * 2 - 1), "card_back").setOrigin(0.5);
-                
-                this.add(this.card1);
-                this.add(this.card2);
-                this.card1.displayWidth = gameOptions.cardWidth * gameOptions.cardScale * 0.8;
-                this.card1.displayHeight = gameOptions.cardHeight * gameOptions.cardScale * 0.8;
-                this.card1.x -= this.card1.displayWidth * 0.05;
-
-                this.card2.displayWidth = gameOptions.cardWidth * gameOptions.cardScale * 0.8;
-                this.card2.displayHeight = gameOptions.cardHeight * gameOptions.cardScale * 0.8;
-                this.card2.x += this.card2.displayWidth * 0.05;
+                this.card1 = new CardSprite(scene, hand[0].suit, hand[0].value)
+                this.card2 = new CardSprite(scene, hand[1].suit, hand[1].value)
             } else {
-                this.card1 = scene.createCard(hand[0].suit, hand[0].value);
-                this.card2 = scene.createCard(hand[1].suit, hand[1].value);
-            
-                this.add(this.card1);
-                this.add(this.card2);
-
-                let y_offset = this.card2.height * this.card2.scale * 1.1;
-                this.card1.y = (newOrrientation * 2 - 1)* y_offset;
-                this.card2.y = (newOrrientation * 2 - 1) * y_offset;
-                this.card1.x = -this.card1.width * this.card1.scale * 0.6;
-                this.card2.x = this.card2.width * this.card2.scale * 0.6;
+                this.card1 = new CardBackSprite(scene);
+                this.card2 = new CardBackSprite(scene);
             }
+
+            this.add(this.card1);
+            this.add(this.card2);
+
+            this.card1.setPosition(this.card1.card.width * this.card1.card.scale * 0.35, 0);
+            this.card2.setPosition(-this.card1.card.width * this.card1.card.scale * 0.35, 0);
+
+            this.card1.setAngle(3);
+            this.card2.setAngle(-3);
+
+            this.bringToTop(this.card2);
+            this.bringToTop(this.card1);
         }
 
         // Move the chips above or below the player
@@ -310,16 +329,16 @@ class PlayGame extends Phaser.Scene {
             }
         });
         PubSub.subscribe('num-winners', (_, change) => {
-            if(this.state.winners["$items"].length > 0) {
+            if (this.state.winners["$items"].length > 0) {
                 this.pot_size.setVisible(false);
-            } 
+            }
         });
 
         this.dealerChit = new DealerChit(this, 0, 0);
         this.dealerChit.setVisible(false);
 
         let player_sprites = [];
-        
+
         for (let i = 0; i < 6; i++) {
             player_sprites.push(new UserSprite(this, -1000, -1000, this.state.player_map.values().next().value, this.userId, this.dealerChit));
         }
@@ -370,7 +389,7 @@ class PlayGame extends Phaser.Scene {
         });
 
         PubSub.subscribe('state-change', (_, __) => {
-            for(let player_sprite of player_sprites) {
+            for (let player_sprite of player_sprites) {
                 player_sprite.setVisible(false);
             }
 
@@ -384,11 +403,11 @@ class PlayGame extends Phaser.Scene {
 
             let index = 0;
             for (let key of player_keys) {
-                const [x, y] = this.get_player_location(players.size, index++);
+                const [x, y] = this.get_player_location(players.size, index);
 
                 player_sprites[index].setPosition(x, y);
                 player_sprites[index].update(this, players.get(key));
-                player_sprites[index].setVisible(true);
+                player_sprites[index++].setVisible(true);
             }
 
             // Create player actions
@@ -427,9 +446,9 @@ class PlayGame extends Phaser.Scene {
                 }
             }
         });
-        
+
         PubSub.subscribe('num-winners', (_, __) => {
-            if(this.state.winners["$items"].length > 0) {
+            if (this.state.winners["$items"].length > 0) {
                 this.startbutton.setVisible(true);
                 this.startbutton.setText("NEXT HAND");
                 this.children.bringToTop(this.startbutton);
@@ -447,13 +466,15 @@ class PlayGame extends Phaser.Scene {
             board_sprites = []
 
             let board = Array.from(this.state.board)
+            let scale_up = 1.2;
             if (board.length > 0) {
-                let card_with = gameOptions.cardWidth * gameOptions.cardScale + 15;
+                let card_with = gameOptions.cardWidth * gameOptions.cardScale * scale_up + 15;
                 let x_offset = screenCenterX - card_with * board.length / 2 + card_with / 2;
 
                 let i = 0;
                 for (let card of board) {
                     let card_sprite = this.createCard(card.suit, card.value).setOrigin(0.5);
+                    card_sprite.scale *= scale_up;
                     card_sprite.x = i * card_with + x_offset;
                     card_sprite.y = screenCenterY;
 
@@ -461,7 +482,7 @@ class PlayGame extends Phaser.Scene {
                     board_sprites.push(card_sprite);
                 }
             }
-        }        
+        }
         PubSub.subscribe("num-board", (_) => {
             update_board();
         })
@@ -478,12 +499,12 @@ class PlayGame extends Phaser.Scene {
         }).setOrigin(0.5).setVisible(false);
         // The value is filled in, even when it's null for the server -- 
         // but it's primitive children can be undefined
-        if(this.state.winningMessage != null) {
+        if (this.state.winningMessage != null) {
             this.winner_text.setVisible(true);
             this.winner_text.setText(this.state.winningMessage);
         }
         PubSub.subscribe('state-change', (_, __) => {
-            if(this.state.winningMessage) {
+            if (this.state.winningMessage) {
                 this.winner_text.setVisible(true);
                 this.winner_text.setText(this.state.winningMessage);
                 this.children.bringToTop(this.winner_text);
@@ -518,23 +539,23 @@ class PlayGame extends Phaser.Scene {
 
     updateState(gameState) {
         let old_num_winners = 0;
-        if(this.state && this.state.winners) {
+        if (this.state && this.state.winners) {
             old_num_winners = this.state.winners.length;
         }
 
         let old_num_board = 0;
-        if(this.state && this.state.board) {
+        if (this.state && this.state.board) {
             old_num_board = this.state.board.length;
         }
 
         this.state = gameState;
         PubSub.publishSync('state-change', this.state);
 
-        if(this.state.winners["$items"].length != old_num_winners) {
+        if (this.state.winners["$items"].length != old_num_winners) {
             PubSub.publishSync('num-winners', {});
         }
 
-        if(this.state.board["$items"].length != old_num_board) {
+        if (this.state.board["$items"].length != old_num_board) {
             PubSub.publishSync('num-board', {});
         }
     }
@@ -575,8 +596,8 @@ class PlayGame extends Phaser.Scene {
 
     get_player_location(num_players, player_index) {
         const center_x = 0.5;
-        const player_bottom = 0.85;
-        const player_top = 0.15;
+        const player_bottom = 0.82;
+        const player_top = 0.13;
         const left_player_x = 0.3;
         const right_player_x = 0.7;
         const far_left_player_x = 0.2;
@@ -585,8 +606,8 @@ class PlayGame extends Phaser.Scene {
         const upper_edge_y = 0.22;
         const lower_edge_y = 0.78;
 
-        const upper_shared_y = 0.19;
-        const lower_shared_y = 0.81;
+        const upper_shared_y = 0.16;
+        const lower_shared_y = 0.79;
 
         const mapping = {
             1: [[center_x, player_bottom]],
@@ -594,7 +615,7 @@ class PlayGame extends Phaser.Scene {
             3: [[center_x, player_bottom], [left_player_x, upper_shared_y], [right_player_x, upper_shared_y]],
             4: [[right_player_x, lower_shared_y], [left_player_x, lower_shared_y], [left_player_x, upper_shared_y], [right_player_x, upper_shared_y]],
             5: [[right_player_x, lower_shared_y], [left_player_x, lower_shared_y], [far_left_player_x, upper_edge_y], [center_x, player_top], [far_right_player_x, upper_edge_y]],
-            6: [[center_x, player_bottom], [far_left_player_x, lower_edge_y], [far_left_player_x, upper_edge_y], [center_x, player_top], [far_right_player_x, upper_edge_y], [far_right_player_x, lower_edge_y],],
+            6: [[center_x, player_bottom], [far_left_player_x, lower_edge_y], [far_left_player_x, upper_edge_y], [center_x, player_top], [far_right_player_x, upper_edge_y], [far_right_player_x, lower_edge_y]],
         }
 
         let player_loc = mapping[num_players][player_index];
