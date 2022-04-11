@@ -121,6 +121,8 @@ export class PokerRoom extends Room<GameState> {
             return Array.from(this.state.player_map.values()).filter(player => player.inRound)[0]
         }
 
+        
+
         return this.state.player_map.get(this.state.player_order[0]);
     }
 

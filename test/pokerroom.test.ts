@@ -4,6 +4,8 @@ import {PokerRoom} from "../backend/PokerRoom";
 import { READY } from "../messages/readystate";
 import {Gamestate} from "../backend/PokerRoom";
 
+console.warn = function() {}
+
 describe("testing your Colyseus app", () => {
     let colyseus: ColyseusTestServer;
   
@@ -270,8 +272,6 @@ describe("testing your Colyseus app", () => {
 
       clients[1].send("fold", {});
       [ c, message ] = await room.waitForMessage("fold");
-
-      console.log(JSON.stringify(room.state, null, 4));
 
       expect(room.state.player_map.get(clients[1].sessionId).isTurn).toBeFalsy();
       expect(room.state.player_map.get(clients[1].sessionId).inRound).toBeFalsy();
