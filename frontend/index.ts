@@ -1,8 +1,12 @@
 import {Client, Room} from "colyseus.js";
 import {GameState} from "../state/GameState";
-import { renderer } from "./game";
+import { createGame } from "./game";
 
 document.addEventListener('DOMContentLoaded', async () => {
+    
+
+});
+async function joinRoom(renderer) {
     const client = new Client('ws://localhost:2567');
 
     const room: Room<GameState> = await client.joinOrCreate<GameState>("poker");
@@ -24,9 +28,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             player.hand["$items"] = player.hand;
         }
 
-        //console.log(newState)
-
         renderer.scenes[0].updateState(newState);
     });
+}
 
-});
+function startGame() {
+    const element = document.getElementById('game-modes');
+    element.remove(); 
+    
+    let renderer = createGame();
+    joinRoom(renderer);
+}
+window.startGame = startGame; // typescript shows an error here but it can be ignored

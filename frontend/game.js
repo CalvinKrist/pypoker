@@ -5,11 +5,11 @@ import card_back from './assets/card_back.png';
 import poker_chip from './assets/poker_chip.png';
 import { READY } from "../messages/readystate";
 import PubSub from 'pubsub-js'
+import { GameState } from '../state/GameState';
 import { FOLD, CALL, raise } from "../messages/playeraction";
-import { Card } from '../state/Card';
 
 export let game;
-export let renderer;
+let renderer;
 
 function arrayRotate(arr, reverse) {
     arr.push(arr.shift());
@@ -27,7 +27,7 @@ let gameOptions = {
 
     cardScale: 0.20
 }
-window.onload = function () {
+export function createGame() {
     let gameConfig = {
         type: Phaser.AUTO,
         backgroundColor: 0xcccccc,
@@ -44,6 +44,8 @@ window.onload = function () {
     game = new Phaser.Game(gameConfig);
     renderer = game.scene;
     window.focus();
+
+    return renderer;
 }
 
 function resizedw() {
@@ -121,16 +123,15 @@ const NONE = 2;
 
 
 class UserSprite extends Phaser.GameObjects.Container {
-    constructor(scene, x, y, player, userId, dealerChit) {
+    constructor(scene, x, y, dealerChit) {
         super(scene, x, y);
         scene.children.add(this);
 
-        this.userId = userId;
         this.dealerChit = dealerChit;
 
-        let name_str = player.id;
-        let bb = player.bb;
-        let isDealer = player.isDealer;
+        let name_str = "";
+        let bb = 0;
+        let isDealer = false;
 
         this.active_user_sprite = scene.add.sprite(0, 0, "active_user_icon");
         this.inactive_user_sprite = scene.add.sprite(0, 0, "user_icon");
@@ -180,7 +181,7 @@ class UserSprite extends Phaser.GameObjects.Container {
             this.add(chip_sprite);
         }
 
-        this.chip_label = scene.add.text(chit_x, 40, player.currentBet + ' BB', {
+        this.chip_label = scene.add.text(chit_x, 40, '0 BB', {
             fontFamily: 'Quicksand',
             fontSize: '24px',
             color: '#000',
@@ -209,7 +210,7 @@ class UserSprite extends Phaser.GameObjects.Container {
         }
 
         if (isDealer) {
-            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth / 2, this.y)
+            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth * 0.75, this.y + 15)
             this.dealerChit.setVisible(true);
         }
 
@@ -227,7 +228,7 @@ class UserSprite extends Phaser.GameObjects.Container {
         let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
 
         if (hand.length > 1 && player.inRound) {
-            if (player.id == this.userId) {
+            if (player.id == scene.userId) {
                 this.card1 = new CardSprite(scene, hand[0].suit, hand[0].value)
                 this.card2 = new CardSprite(scene, hand[1].suit, hand[1].value)
             } else {
@@ -278,7 +279,7 @@ class UserSprite extends Phaser.GameObjects.Container {
 class PlayGame extends Phaser.Scene {
     constructor() {
         super("PlayGame");
-        this.state = null;
+        this.state = new GameState();
         this.userId = null;
         this.room = null;
     }
@@ -298,10 +299,6 @@ class PlayGame extends Phaser.Scene {
     }
 
     create() {
-        if (this.state == null) {
-            return;
-        }
-
         // create an array with 52 integers from 0 to 51
         this.deck = Phaser.Utils.Array.NumberArray(0, 51);
 
@@ -340,7 +337,7 @@ class PlayGame extends Phaser.Scene {
         let player_sprites = [];
 
         for (let i = 0; i < 6; i++) {
-            player_sprites.push(new UserSprite(this, -1000, -1000, this.state.player_map.values().next().value, this.userId, this.dealerChit));
+            player_sprites.push(new UserSprite(this, -1000, -1000, this.dealerChit));
         }
 
         this.fold = this.drawButton("Fold", this.cameras.main.width * 0.7, this.cameras.main.height * 0.9, () => { this.room.send("fold", FOLD) });

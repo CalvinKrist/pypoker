@@ -409,7 +409,7 @@ export class PokerRoom extends Room<GameState> {
             // Reset the game if we were in the end-game menu
             if (this.gameState == Gamestate.EndGame || this.gameState == Gamestate.Preround) {
                 this.deletePlayer(client.id);
-                this.reset();
+                this.reset(); 
                 return;
             } else {
                 this.toDelete.push(client.id);
