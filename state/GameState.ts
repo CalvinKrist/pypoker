@@ -1,6 +1,5 @@
 import {ArraySchema, MapSchema, Schema, type} from "@colyseus/schema";
 import {Player} from "./Player";
-import {Deck} from "./Deck";
 import {Card} from "./Card";
 
 export class GameState extends Schema {
@@ -9,9 +8,6 @@ export class GameState extends Schema {
 
     @type(["string"])
     player_order: string[];
-
-    @type(Deck)
-    deck: Deck;
 
     @type([Card])
     board: ArraySchema<Card>;
@@ -30,7 +26,6 @@ export class GameState extends Schema {
 
     constructor() {
         super();
-        this.deck = new Deck();
         this.player_map = new MapSchema<Player>();
         this.running = false;
         this.player_order = new ArraySchema<string>();

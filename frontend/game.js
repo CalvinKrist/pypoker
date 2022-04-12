@@ -28,6 +28,8 @@ let gameOptions = {
     cardScale: 0.20
 }
 export function createGame() {
+    document.body.style['overflow'] = 'hidden';
+
     let gameConfig = {
         type: Phaser.AUTO,
         backgroundColor: 0xcccccc,
@@ -45,19 +47,18 @@ export function createGame() {
     renderer = game.scene;
     window.focus();
 
+    var doit;
+    window.onresize = function (event) {
+        clearTimeout(doit);
+        doit = setTimeout(resizedw, 100);
+    };
+
     return renderer;
 }
 
 function resizedw() {
     renderer.scenes[0].scene.restart();
 }
-
-var doit;
-window.onresize = function (event) {
-    clearTimeout(doit);
-    doit = setTimeout(resizedw, 100);
-};
-
 
 class DealerChit extends Phaser.GameObjects.Container {
     constructor(scene, x, y) {
@@ -394,8 +395,10 @@ class PlayGame extends Phaser.Scene {
             const players = this.state.player_map;
             // Rotate the player state so the player is in the center bottom
             let player_keys = Array.from(player_ids.values())
-            while (players.get(player_keys[0]).id != this.userId) {
-                arrayRotate(player_keys);
+            if (player_keys.length > 0) {
+                while (players.get(player_keys[0]).id != this.userId) {
+                    arrayRotate(player_keys);
+                }
             }
 
             let index = 0;
@@ -535,6 +538,16 @@ class PlayGame extends Phaser.Scene {
     }
 
     updateState(gameState) {
+        gameState.player_map = new Map(Object.entries(gameState.player_map));
+        gameState.player_map["$items"] = gameState.player_map;
+        gameState.winners["$items"] = gameState.winners;
+        gameState.player_order["$items"] = gameState.player_order;
+        gameState.board["$items"] = gameState.board;
+
+        for (let player of gameState.player_map.values()) {
+            player.hand["$items"] = player.hand;
+        }
+
         let old_num_winners = 0;
         if (this.state && this.state.winners) {
             old_num_winners = this.state.winners.length;

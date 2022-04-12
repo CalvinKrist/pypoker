@@ -38,6 +38,7 @@ export class PokerRoom extends Room<GameState> {
     currentBet: number;
     lastRaise: number;
     currentPlay: string;
+    deck: Deck;
     toDelete: string[];
 
     constructor() {
@@ -48,6 +49,7 @@ export class PokerRoom extends Room<GameState> {
         this.lastRaise = 0;
         this.currentPlay = ""; // tracks which player the play comes off of, ie the last player to bet
         this.toDelete = [];
+        this.deck = new Deck();
     }
 
     private allPlayersReady(): boolean {
@@ -106,7 +108,7 @@ export class PokerRoom extends Room<GameState> {
         this.lastRaise = 0;
 
         for (let i = 0; i < numCardsToDeal; i++) {
-            this.state.board.push(this.state.deck.deal());
+            this.state.board.push(this.deck.deal());
         }
 
         this.state.player_map.forEach((player) => { player.currentBet = 0; player.isTurn = false; })
@@ -178,8 +180,8 @@ export class PokerRoom extends Room<GameState> {
             }
 
             for (let [player_id, player] of this.state.player_map.entries()) {
-                player.hand.push(this.state.deck.deal());
-                player.hand.push(this.state.deck.deal());
+                player.hand.push(this.deck.deal());
+                player.hand.push(this.deck.deal());
                 player.inRound = true;
             }
 
@@ -281,7 +283,7 @@ export class PokerRoom extends Room<GameState> {
         this.state.pot = 0;
         this.state.board = new ArraySchema<Card>();
         this.state.running = false;
-        this.state.deck = new Deck();
+        this.deck = new Deck();
         this.state.winners = [];
         this.state.winningMessage = null;
 
@@ -303,7 +305,6 @@ export class PokerRoom extends Room<GameState> {
         //console.log("deletePlayer")
     }
   
-    // TODO: on a second game in a lobby, folding moves to the next state instead
     private fold(id: string) {
         let player = this.state.player_map.get(id);
         this.incrementPlayerTurn(player, true);
@@ -442,3 +443,10 @@ export class PokerRoom extends Room<GameState> {
         //console.log("flush")
     }
 }
+
+/*
+Feature list:
+- if someone is all-in, don't give them any more turns
+- if someone is all-in, and more players bet, make a new pot for that
+- verify that people aren't raising more chips than they have
+*/

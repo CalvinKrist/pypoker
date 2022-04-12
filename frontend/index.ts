@@ -1,42 +1,54 @@
-import {Client, Room} from "colyseus.js";
-import {GameState} from "../state/GameState";
+import { Client, Room } from "colyseus.js";
+import { GameState } from "../state/GameState";
 import { createGame } from "./game";
+import { Player } from "./Player";
+import { RandomBot } from "./RandomBot";
 
-document.addEventListener('DOMContentLoaded', async () => {
-    
-
-});
-async function joinRoom(renderer) {
+async function joinRoom(playerPromise: Promise<Player>) {
     const client = new Client('ws://localhost:2567');
 
+    // Need to wait before we join the room, or we may miss the
+    // first message with our updateed state
+    let player = await playerPromise;
+
     const room: Room<GameState> = await client.joinOrCreate<GameState>("poker");
-    renderer.scenes[0].setUserId(room.sessionId);
-    renderer.scenes[0].setRoom(room);
+    player.setUserId(room.sessionId);
+    player.setRoom(room);
 
     room.state.onChange = (changes) => {
-        renderer.scenes[0].onStateChanges(changes);
+        player.onStateChanges(changes);
     };
 
     room.onMessage("state-update", (newState) => {
-        newState.player_map = new Map(Object.entries(newState.player_map));
-        newState.player_map["$items"] = newState.player_map;
-        newState.winners["$items"] = newState.winners;
-        newState.player_order["$items"] = newState.player_order;
-        newState.board["$items"] = newState.board;
-
-        for(let player of newState.player_map.values()) {
-            player.hand["$items"] = player.hand;
-        }
-
-        renderer.scenes[0].updateState(newState);
+        player.updateState(newState);
     });
+}
+
+function startRandomBot() {
+    let element = document.getElementById('game-modes');
+    element.remove();
+
+    element = document.getElementById('canvas');
+    element.remove();
+
+    joinRoom(new Promise((resolve, reject) => {
+        resolve(new RandomBot());
+    }));
 }
 
 function startGame() {
     const element = document.getElementById('game-modes');
-    element.remove(); 
-    
+    element.remove();
+
     let renderer = createGame();
-    joinRoom(renderer);
+    // The scene is not ready yet, so we need to use a 
+    // promise for the player intead
+    joinRoom(new Promise((resolve, reject) => {
+        setTimeout(() => {
+            resolve(renderer.scenes[0]);
+        }, 300);
+    }));
 }
+
 window.startGame = startGame; // typescript shows an error here but it can be ignored
+window.startRandomBot = startRandomBot; // typescript shows an error here but it can be ignored
