@@ -610,6 +610,7 @@ class PlayGame extends Phaser.Scene {
             if (this.state.winners["$items"].length > 0) {
                 this.startbutton.setVisible(true);
                 this.startbutton.setText("NEXT HAND");
+                this.startbutton.y = screenCenterY * 1.3;
                 this.children.bringToTop(this.startbutton);
             }
         });

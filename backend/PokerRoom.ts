@@ -63,6 +63,17 @@ export class PokerRoom extends Room<GameState> {
         return true;
     }
 
+    private sleep(num_millis: number, callback: Function) {
+        this.clock.start();
+
+        let d = this.clock.setTimeout(() => {
+            this.clock.stop();
+            d.clear();
+            callback();
+        }, num_millis);
+        return;
+    }
+
     private getNextPlayer(player: Player) {
         let active_players = Array.from(this.state.player_order).filter(id => this.state.player_map.get(id).inRound).map(id => this.state.player_map.get(id));
         return active_players[(active_players.indexOf(player) + 1) % active_players.length]
@@ -77,6 +88,10 @@ export class PokerRoom extends Room<GameState> {
         return Array.from(this.state.player_map.values()).filter(player => player.inRound).length;
     }
 
+    private numPlayersAllIn() {
+        return Array.from(this.state.player_map.values()).filter(player => player.bb == 0 && player.inRound).length;
+    }
+
     private incrementPlayerTurn(player: Player, leaveRound: boolean = false) {
         let next_player = this.getNextPlayer(player);
         player.isTurn = false;
@@ -89,19 +104,62 @@ export class PokerRoom extends Room<GameState> {
         //console.log("incrementPlayerTurn")
     }
 
+    // TODO: add unit tests for the logic of going around the table
+    /*
+    Transitions the state if we have gone all the way around the table
+    */
     private transitionIfNeeded() {
         if (this.getCurrentPlayer().id == this.currentPlay) {
-            if (this.gameState == Gamestate.Preflop) {
-                this.transitionState(Gamestate.Flop);
-            } else if (this.gameState == Gamestate.Flop) {
-                this.transitionState(Gamestate.Turn);
-            } else if (this.gameState == Gamestate.Turn) {
-                this.transitionState(Gamestate.River);
-            } else if (this.gameState == Gamestate.River) {
-                this.transitionState(Gamestate.EndGame);
+            if(this.numPlayersInRound() - this.numPlayersAllIn() <= 1) {
+                this.allInSequence();
+            } else {
+                if (this.gameState == Gamestate.Preflop) {
+                    this.transitionState(Gamestate.Flop);
+                } else if (this.gameState == Gamestate.Flop) {
+                    this.transitionState(Gamestate.Turn);
+                } else if (this.gameState == Gamestate.Turn) {
+                    this.transitionState(Gamestate.River);
+                } else if (this.gameState == Gamestate.River) {
+                    this.transitionState(Gamestate.EndGame);
+                }
             }
         }
         //console.log("transitionIfNeeded")
+    }
+
+    private disablePlayerTurns() {
+        for(let player of this.state.player_map.values()) {
+            player.isTurn = false;
+        }
+    }
+
+    private allInSequence() {
+        this.disablePlayerTurns();
+
+        if (this.gameState == Gamestate.Preflop) {
+            this.transitionState(Gamestate.Flop);
+            this.disablePlayerTurns();
+            this.flush();
+            this.sleep(2000, () => {
+                this.allInSequence();
+            });
+        } else if (this.gameState == Gamestate.Flop) {
+            this.transitionState(Gamestate.Turn);
+            this.disablePlayerTurns();
+            this.flush();
+            this.sleep(2000, () => {
+                this.allInSequence();
+            });
+        } else if (this.gameState == Gamestate.Turn) {
+            this.transitionState(Gamestate.River);
+            this.disablePlayerTurns();
+            this.flush();
+            this.sleep(2000, () => {
+                this.allInSequence();
+            });
+        } else if (this.gameState == Gamestate.River) {
+            this.transitionState(Gamestate.EndGame);
+        }
     }
 
     private nextStatePostFlop(numCardsToDeal: number) {
@@ -380,12 +438,19 @@ export class PokerRoom extends Room<GameState> {
             //console.log("onMessage::fold")
         });
         this.onMessage("call", (client, message) => {
-            if(this.getCurrentPlayer().id == client.id) {
+            if(this.getCurrentPlayer().id == client.id) { // TODO: can also crash when current player doesn't exist?
                 let player = this.state.player_map.get(client.id);
                 player.lastAction = CALL;
-                player.bb -= this.currentBet - player.currentBet;
-                this.state.pot += this.currentBet - player.currentBet;
-                player.currentBet = this.currentBet;
+                if(player.bb >= this.currentBet - player.currentBet) {
+                    player.bb -= this.currentBet - player.currentBet;
+                    this.state.pot += this.currentBet - player.currentBet;
+                    player.currentBet = this.currentBet;
+                } else {
+                    this.state.pot += player.bb;
+                    player.currentBet += player.bb;
+                    player.bb = 0;
+                }
+
                 this.incrementPlayerTurn(player)
                 this.transitionIfNeeded();
 

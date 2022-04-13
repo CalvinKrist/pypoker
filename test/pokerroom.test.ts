@@ -281,6 +281,27 @@ describe("testing your Colyseus app", () => {
       expect(room.state.pot).toEqual(startingPot + raiseAmt - startingBet);
     });
 
+    it("when a player calls a bet of more chips than they have, they go all in", async() => {
+      let num_clients = 3;
+      
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
+      let room = game.room;
+      let clients = game.clients;
+
+      game.getPlayer(1).bb = 20;
+      game.getPlayer(0).bb = 40;
+
+      let [ c, message ] = await game.action(0, "raise", raise(40));
+
+      expect(game.getPlayer(1).isTurn).toBeTruthy();
+      [ c, message ] = await game.action(1, "call", {});
+
+      expect(game.getPlayer(1).bb).toEqual(0);
+      expect(room.state.pot).toEqual(1.5 + 40 + 20);
+      expect(game.getPlayer(1).isTurn).toBeFalsy();
+    });
+
     it("when a player joins mid-round, they sit left of the dealer", async() => {
       let num_clients = 3;
       

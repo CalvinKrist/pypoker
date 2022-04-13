@@ -33,7 +33,7 @@ export class RandomBot extends Bot {
                     this.room.send("call", {});
                 } else if(choice == 2) {
                     this.log("GOING ALL IN")
-                    this.room.send("raise", raise(this.state.player_map[this.id].bb));
+                    this.room.send("raise", raise(this.state.player_map[this.id].bb + this.state.player_map[this.id].currentBet));
                 }
             }
         }
