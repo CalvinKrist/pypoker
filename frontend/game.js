@@ -484,14 +484,16 @@ class PlayGame extends Phaser.Scene {
         }
 
         this.fold = this.drawButton("Fold", this.cameras.main.width * 0.7, this.cameras.main.height * 0.9, () => { this.room.send("fold", {}) });
-        this.call = this.drawButton("Call", this.fold.x + this.fold.width + 20, this.cameras.main.height * 0.9, () => { this.room.send("call", {}) });
-        this.raise_btn = this.drawButton("Raise", this.call.x + this.call.width + 30, this.cameras.main.height * 0.9, () => { });
+        this.call = this.drawButton("Call", this.fold.x + this.fold.width * 0.5 + 10, this.cameras.main.height * 0.9, () => { this.room.send("call", {}) });
+        this.call.x += this.call.width * 0.5;
+        this.raise_btn = this.drawButton("Raise To", this.call.x + this.call.width * 0.5 + 10, this.cameras.main.height * 0.9, () => { });
+        this.raise_btn.x += this.raise_btn.width * 0.5;
 
         this.fold.setVisible(false);
         this.call.setVisible(false);
         this.raise_btn.setVisible(false);
 
-        this.bet_submit_btn = this.drawButton("Send", this.raise_btn.x + this.raise_btn.width * 0.5, this.raise_btn.y - this.raise_btn.displayHeight * 1.2, () => { });
+        this.bet_submit_btn = this.drawButton("Send", this.raise_btn.x + this.raise_btn.width * 0.3, this.raise_btn.y - this.raise_btn.displayHeight * 1.2, () => { });
         this.bet_submit_btn.setStyle({
             fontFamily: 'Quicksand',
             fontSize: '18px',

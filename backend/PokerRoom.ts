@@ -4,7 +4,7 @@ import { Player } from "../state/Player";
 import { ArraySchema } from "@colyseus/schema";
 import { ReadyState } from "../messages/readystate";
 import { ErrorMessage } from "../messages/error";
-import { FOLD, CALL, RAISE, Raise } from "../messages/playeraction";
+import { FOLD, CALL, RAISE, ALL_IN, Raise } from "../messages/playeraction";
 import { Deck } from "../state/Deck";
 import * as HandComparer from "./HandComparer";
 import { Card } from "../state/Card";
@@ -47,7 +47,7 @@ export class PokerRoom extends Room<GameState> {
         this.maxClients = 6;
         this.gameState = Gamestate.Preround;
         this.currentBet = 0;
-        this.lastRaise = 0;
+        this.lastRaise = 0.5;
         this.currentPlay = ""; // tracks which player the play comes off of, ie the last player to bet
         this.toDelete = [];
         this.deck = new Deck();
@@ -213,7 +213,7 @@ export class PokerRoom extends Room<GameState> {
             this.currentPlay = this.state.player_map.get(starting_player_id).id;
 
             this.currentBet = 1;
-            this.lastRaise = 1;
+            this.lastRaise = 0.5;
 
             this.gameState = nextState;
         } else if (this.gameState == Gamestate.Preflop && nextState == Gamestate.Flop) {
@@ -281,7 +281,7 @@ export class PokerRoom extends Room<GameState> {
 
         this.currentPlay = "";
         this.currentBet = 0;
-        this.lastRaise = 0;
+        this.lastRaise = 0.5;
         this.state.pot = 0;
         this.state.board = new ArraySchema<Card>();
         this.state.running = false;
@@ -332,6 +332,27 @@ export class PokerRoom extends Room<GameState> {
         //console.log("fold")
     }
 
+    private raise(amount: number, player: Player) {
+        this.lastRaise = amount - 1;
+        
+        this.currentBet = amount;
+
+        player.bb -= amount - player.currentBet;
+        this.state.pot += amount - player.currentBet;
+        player.currentBet = amount;
+
+        if(player.bb == 0) {
+            player.lastAction = ALL_IN;
+        } else {
+            player.lastAction = RAISE;
+        }
+
+        this.incrementPlayerTurn(player)
+        this.currentPlay = player.id;
+
+        this.flush();
+    }
+
     onCreate(options: any) {
         this.setState(new GameState());
 
@@ -376,27 +397,24 @@ export class PokerRoom extends Room<GameState> {
         });
         this.onMessage("raise", (client, message: Raise) => {
             if(this.getCurrentPlayer().id == client.id) {
-                let requiredMessage = this.lastRaise * 0.5 + this.currentBet;
-                if (message.amount < 1) {
-                    console.log("Bet less than minimum")
+                // Player must raise at least twice the last raise
+                let requiredMessage = 1 + this.lastRaise * 2;
+                let player = this.state.player_map.get(client.id);
+
+                if(player.bb <= (requiredMessage - player.currentBet) && message.amount == (player.bb + player.currentBet)) {
+                    // Player is all-ining: this is okay
+                    this.raise(message.amount, player);
+                } else if (message.amount < 1) {
+                    console.log("Bet less than minimum. Bet must be at least " + requiredMessage)
                     client.send("error", new ErrorMessage("Bet must be at least " + requiredMessage))
                 } else if (message.amount < requiredMessage) {
-                    console.log("Must raise at least twice the last raise")
+                    console.log("Must raise at least twice the last raise. Bet must be at least " + requiredMessage)
                     client.send("error", new ErrorMessage("Bet must be at least " + requiredMessage))
+                } else if(message.amount > player.bb + player.currentBet) {
+                    console.log("Player bet more chips than they have")
+                    client.send("error", new ErrorMessage("Bet cannot be more than " + (player.bb +  player.currentBet)));
                 } else {
-                    this.lastRaise = message.amount - this.currentBet;
-                    this.currentBet = message.amount;
-
-                    let player = this.state.player_map.get(client.id);
-                    player.lastAction = RAISE;
-                    player.bb -= message.amount - player.currentBet;
-                    this.state.pot += message.amount - player.currentBet;
-                    player.currentBet = message.amount;
-
-                    this.incrementPlayerTurn(player)
-                    this.currentPlay = player.id;
-
-                    this.flush();
+                    this.raise(message.amount, player);
                 }
             } else {
                 client.send("error", new ErrorMessage("Cannot raise until your turn."))

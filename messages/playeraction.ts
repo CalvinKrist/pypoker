@@ -9,3 +9,4 @@ export function raise(amount: number): Raise{
 export const FOLD = "fold";
 export const CALL = "call";
 export const RAISE = "raise";
+export const ALL_IN = "all-in";

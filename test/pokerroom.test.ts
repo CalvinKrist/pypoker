@@ -1,6 +1,7 @@
 import { ColyseusTestServer, boot } from "@colyseus/testing";
 import {gameServer} from "../backend/serverConfig";
 import {PokerRoom} from "../backend/PokerRoom";
+import { FOLD, CALL, RAISE, ALL_IN } from "../messages/playeraction";
 import { READY } from "../messages/readystate";
 import { raise } from "../messages/playeraction";
 import {Gamestate} from "../backend/PokerRoom";
@@ -26,6 +27,10 @@ class Game {
   async action(client_idx: number, action: string, message: any) {
     this.clients[client_idx].send(action, message);
     return await this.room.waitForMessage(action);
+  }
+
+  getPlayer(i: number) {
+    return this.room.state.player_map.get(this.clients[i].sessionId);
   }
 }
 
@@ -116,19 +121,19 @@ describe("testing your Colyseus app", () => {
         let game = await createRoomWithClients(colyseus, num_clients);
         await game.ready();
 
-        expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeTruthy();
-        expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeTruthy();
+        expect(game.getPlayer(0).isTurn).toBeTruthy();
+        expect(game.getPlayer(0).isDealer).toBeTruthy();
       }
     });
 
-    it("when the round starts, player 0 is the dealer and does not have the turn", async() => {
+    it("4/5/6 players: when the round starts, player 0 is the dealer and does not have the turn", async() => {
       let num_clients = 4;
       
       let game = await createRoomWithClients(colyseus, num_clients);
       await game.ready();
 
-      expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeTruthy();
-      expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeFalsy();
+      expect(game.getPlayer(0).isDealer).toBeTruthy();
+      expect(game.getPlayer(0).isTurn).toBeFalsy();
     });
 
     it("when a player folds they leave the round and their turn ends", async() => {
@@ -139,8 +144,8 @@ describe("testing your Colyseus app", () => {
 
         const [ c, message ] = await game.action(0, "fold", {});
 
-        expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeFalsy();
-        expect(game.room.state.player_map.get(game.clients[0].sessionId).inRound).toBeFalsy();
+        expect(game.getPlayer(0).isTurn).toBeFalsy();
+        expect(game.getPlayer(0).inRound).toBeFalsy();
       }
     });
 
@@ -149,13 +154,13 @@ describe("testing your Colyseus app", () => {
       let game = await createRoomWithClients(colyseus, num_clients);
       await game.ready();
 
-      expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeTruthy();
+      expect(game.getPlayer(3).isTurn).toBeTruthy();
 
       const [ c, message ] = await game.action(3, "fold", {});
 
-      expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeFalsy();
-      expect(game.room.state.player_map.get(game.clients[3].sessionId).inRound).toBeFalsy();
-      expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeTruthy();   
+      expect(game.getPlayer(3).isTurn).toBeFalsy();
+      expect(game.getPlayer(3).inRound).toBeFalsy();
+      expect(game.getPlayer(0).isTurn).toBeTruthy();   
     });
 
     it("when a player folds and the next player is skipped, play moves to the next player still", async() => {
@@ -167,10 +172,10 @@ describe("testing your Colyseus app", () => {
 
       const [ c, message ] = await game.action(3, "fold", {});
 
-      expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeFalsy();
-      expect(game.room.state.player_map.get(game.clients[3].sessionId).inRound).toBeFalsy();
-      expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeFalsy();
-      expect(game.room.state.player_map.get(game.clients[1].sessionId).isTurn).toBeTruthy();
+      expect(game.getPlayer(3).isTurn).toBeFalsy();
+      expect(game.getPlayer(3).inRound).toBeFalsy();
+      expect(game.getPlayer(0).isTurn).toBeFalsy();
+      expect(game.getPlayer(1).isTurn).toBeTruthy();
     });
 
     it("when a new round ends and everyone readys up, we start a new round", async() => {
@@ -195,7 +200,7 @@ describe("testing your Colyseus app", () => {
       let game = await createRoomWithClients(colyseus, num_clients);
       await game.ready();
 
-      expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeTruthy();
+      expect(game.getPlayer(0).isDealer).toBeTruthy();
 
       let [ c, message ] = await game.action(0, "fold", {});
       [ c, message ] = await game.action(1, "fold", {});
@@ -205,8 +210,8 @@ describe("testing your Colyseus app", () => {
         const [ c, message ] = await game.room.waitForMessage("ready");
       }
 
-      expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeFalsy();
-      expect(game.room.state.player_map.get(game.clients[1].sessionId).isDealer).toBeTruthy();
+      expect(game.getPlayer(0).isDealer).toBeFalsy();
+      expect(game.getPlayer(1).isDealer).toBeTruthy();
     });
 
     it("when a new round starts and a player folds, play moves to the next player", async() => {
@@ -220,13 +225,13 @@ describe("testing your Colyseus app", () => {
 
       await game.ready();
 
-      expect(game.room.state.player_map.get(game.clients[1].sessionId).isTurn).toBeTruthy();
+      expect(game.getPlayer(1).isTurn).toBeTruthy();
 
       [ c, message ] = await game.action(1, "fold", {});
 
-      expect(game.room.state.player_map.get(game.clients[1].sessionId).isTurn).toBeFalsy();
-      expect(game.room.state.player_map.get(game.clients[1].sessionId).inRound).toBeFalsy();
-      expect(game.room.state.player_map.get(game.clients[2].sessionId).isTurn).toBeTruthy();
+      expect(game.getPlayer(1).isTurn).toBeFalsy();
+      expect(game.getPlayer(1).inRound).toBeFalsy();
+      expect(game.getPlayer(2).isTurn).toBeTruthy();
     });
 
     it("when a player raises, they put money in the pot", async() => {
@@ -246,7 +251,8 @@ describe("testing your Colyseus app", () => {
 
       let [ c, message ] = await game.action(0, "raise", raise(raiseAmt));
 
-      expect(room.state.player_map.get(clients[0].sessionId).bb).toEqual(startingBB - raiseAmt);
+      expect(game.getPlayer(0).bb).toEqual(startingBB - raiseAmt);
+      expect(game.getPlayer(0).lastAction).toEqual(RAISE);
       expect(room.state.pot).toEqual(startingPot + raiseAmt);
       expect(room.currentBet).toEqual(raiseAmt);
       expect(room.lastRaise).toEqual(raiseAmt - startingBet);
@@ -260,8 +266,8 @@ describe("testing your Colyseus app", () => {
       let room = game.room;
       let clients = game.clients;
 
-      let startingBB = room.state.player_map.get(clients[1].sessionId).bb;
-      let startingBet = room.state.player_map.get(clients[1].sessionId).currentBet;
+      let startingBB = game.getPlayer(1).bb;
+      let startingBet = game.getPlayer(1).currentBet;
 
       let raiseAmt = 10;
 
@@ -271,7 +277,7 @@ describe("testing your Colyseus app", () => {
 
       [ c, message ] = await game.action(1, "call", {});
 
-      expect(room.state.player_map.get(clients[1].sessionId).bb).toEqual(startingBB - raiseAmt + startingBet);
+      expect(game.getPlayer(1).bb).toEqual(startingBB - raiseAmt + startingBet);
       expect(room.state.pot).toEqual(startingPot + raiseAmt - startingBet);
     });
 
@@ -338,8 +344,26 @@ describe("testing your Colyseus app", () => {
       }
     });
 
+    it("in a 2-player game, the dealer is the SB and the other player is the BB", async() => {
+      let num_clients = 2;
+      
+      let game = await createRoomWithClients(colyseus, num_clients);
+
+      let startingBB = game.getPlayer(0).bb;
+
+      await game.ready();
+      let room = game.room;
+
+      expect(game.getPlayer(0).isDealer).toBeTruthy();
+      expect(game.getPlayer(0).bb).toEqual(startingBB - 0.5);
+      expect(game.getPlayer(0).currentBet).toEqual(0.5);
+      expect(game.getPlayer(1).bb).toEqual(startingBB - 1);
+      expect(game.getPlayer(1).currentBet).toEqual(1);
+      expect(room.state.pot).toEqual(1.5);
+    });
+
     describe("Minimum raising rules are correct", () => {
-      it("test case 1", async() => {
+      it("test min-raise on 2-bet preflop", async() => {
         let num_clients = 3;
         
         let game = await createRoomWithClients(colyseus, num_clients);
@@ -347,10 +371,201 @@ describe("testing your Colyseus app", () => {
         let room = game.room;
         let clients = game.clients;
   
-        // Assert that the first client cannot raise less than 1bb
-        expect(clients[0].isTurn).toBeTruthy();
+        // Assert that the first client cannot bet less than 2bb
+        let raises = [0.1, 1, 1.5, 1.9]
+        for(let amount of raises) {
+          expect(game.getPlayer(0).isDealer).toBeTruthy();
+          expect(game.getPlayer(0).isTurn).toBeTruthy();
+  
+          let bb = game.getPlayer(0).bb;
+          await game.action(0, "raise", raise(amount));
+  
+          expect(game.getPlayer(0).isTurn).toBeTruthy();
+          expect(game.getPlayer(0).bb).toEqual(bb);
+          expect(room.state.pot).toEqual(1.5);
+        }
 
+        // Assert that min-raise to 2bb works
+        await game.action(0, "raise", raise(2));
+        expect(room.state.pot).toEqual(3.5);
+        expect(game.getPlayer(0).isTurn).toBeFalsy();
+      });
 
+      it("when sb min-bets they loose 1.5 bb more", async() => {
+        let num_clients = 2;
+        
+        let game = await createRoomWithClients(colyseus, num_clients);
+        await game.ready();
+        let room = game.room;
+        let clients = game.clients;
+  
+        let bb = game.getPlayer(0).bb;
+
+        // Assert that min-raise to 2bb works
+        await game.action(0, "raise", raise(2));
+        expect(room.state.pot).toEqual(3);
+        expect(game.getPlayer(0).bb).toEqual(bb - 1.5);
+      });
+
+      it("test min-raise 1-bet post-flop", async() => {
+        let num_clients = 3;
+        
+        let game = await createRoomWithClients(colyseus, num_clients);
+        await game.ready();
+        let room = game.room;
+        let clients = game.clients;
+
+        await game.action(0, "call", {});
+        await game.action(1, "call", {});
+        await game.action(2, "call", {});
+
+        expect(room.gameState).toEqual(Gamestate.Flop);
+  
+        // Assert that the first client cannot bet less than 1bb
+        let raises = [0.1, 0.5, 0.9]
+        for(let amount of raises) {
+          expect(game.getPlayer(1).isTurn).toBeTruthy();
+  
+          let bb = game.getPlayer(1).bb;
+          await game.action(1, "raise", raise(amount));
+  
+          expect(game.getPlayer(1).isTurn).toBeTruthy();
+          expect(game.getPlayer(1).bb).toEqual(bb);
+          expect(room.state.pot).toEqual(3);
+        }
+
+        // Assert that min-raise to 1bb works
+        let chipsBeforeBet = game.getPlayer(1).bb;
+        await game.action(1, "raise", raise(1));
+        expect(room.state.pot).toEqual(4);
+        expect(game.getPlayer(1).isTurn).toBeFalsy();
+        expect(game.getPlayer(1).bb).toEqual(chipsBeforeBet - 1);
+      });
+
+      it("test min-raise 2-bet post-flop", async() => {
+        let num_clients = 3;
+        
+        let game = await createRoomWithClients(colyseus, num_clients);
+        await game.ready();
+        let room = game.room;
+        let clients = game.clients;
+
+        await game.action(0, "call", {});
+        await game.action(1, "call", {});
+        await game.action(2, "call", {});
+
+        expect(room.gameState).toEqual(Gamestate.Flop);
+
+        await game.action(1, "raise", raise(1));
+  
+        // Assert that the second player cannot bet less than 2bb
+        let raises = [0.1, 1, 1.5, 1.9]
+        for(let amount of raises) {
+          expect(game.getPlayer(2).isTurn).toBeTruthy();
+  
+          let bb = game.getPlayer(2).bb;
+          await game.action(2, "raise", raise(amount));
+  
+          expect(game.getPlayer(2).isTurn).toBeTruthy();
+          expect(game.getPlayer(2).bb).toEqual(bb);
+          expect(room.state.pot).toEqual(4);
+        }
+
+        // Assert that min-raise to 2bb works
+        let chipsBeforeBet = game.getPlayer(2).bb;
+        await game.action(2, "raise", raise(2));
+        expect(game.getPlayer(2).isTurn).toBeFalsy();
+        expect(room.state.pot).toEqual(6);
+        expect(game.getPlayer(2).bb).toEqual(chipsBeforeBet - 1);
+      });
+
+      it("test min-raise on 3-bet preflop", async() => {
+        let num_clients = 3;
+        
+        let game = await createRoomWithClients(colyseus, num_clients);
+        let statingChips = game.getPlayer(1).bb;
+        await game.ready();
+        let room = game.room;
+        let clients = game.clients;
+
+        // Assert that if someone raises by 5 (to a total bet of 6),
+        // the next min-bet is 11 (5 * 2 + bb)
+        await game.action(0, "raise", raise(6));
+        expect(room.state.pot).toEqual(7.5);
+
+        let raises = [2, 3, 8, 10, 10.9]
+        for(let amount of raises) {
+          expect(game.getPlayer(1).isTurn).toBeTruthy();
+  
+          let bb = game.getPlayer(1).bb;
+          await game.action(1, "raise", raise(amount));
+  
+          expect(game.getPlayer(1).isTurn).toBeTruthy();
+          expect(game.getPlayer(1).bb).toEqual(bb);
+          expect(room.state.pot).toEqual(7.5);
+        }
+
+        // Assert that min-raise to 11bb works
+        await game.action(1, "raise", raise(11));
+        expect(room.state.pot).toEqual(18);
+        expect(game.getPlayer(1).isTurn).toBeFalsy();
+        expect(game.getPlayer(1).currentBet).toEqual(11);
+        expect(game.getPlayer(1).bb).toEqual(statingChips - 11);
+      });
+
+      it("assert player can all-in even if chips < minBet", async() => {
+        let num_clients = 3;
+        
+        let game = await createRoomWithClients(colyseus, num_clients);
+        let statingChips = game.getPlayer(1).bb;
+        await game.ready();
+        let room = game.room;
+        let clients = game.clients;
+
+        // If someone raises by 5 (to a total bet of 6),
+        // the next min-bet is 11 (5 * 2 + bb)
+        await game.action(0, "raise", raise(6));
+        expect(room.state.pot).toEqual(7.5);
+
+        // Player 1 has less than the min-bet
+        game.getPlayer(1).bb = 10;
+        game.getPlayer(1).currentBet = 1;
+
+        // Assert player 1 can't bet with less than all their chips
+        await game.action(1, "raise", raise(10));
+        expect(room.state.pot).toEqual(7.5);
+        expect(game.getPlayer(1).bb).toEqual(10);
+        expect(game.getPlayer(1).isTurn).toBeTruthy();
+
+        await game.action(1, "raise", raise(11));
+        expect(room.state.pot).toEqual(17.5);
+        expect(game.getPlayer(1).bb).toEqual(0);
+        expect(game.getPlayer(1).isTurn).toBeFalsy();
+        expect(game.getPlayer(1).lastAction).toEqual(ALL_IN);
+      });
+
+      it("assert a player can't bet more chips than they have", async() => {
+        let num_clients = 3;
+        
+        let game = await createRoomWithClients(colyseus, num_clients);
+        let statingChips = game.getPlayer(1).bb;
+        await game.ready();
+        let room = game.room;
+        let clients = game.clients;
+
+        game.getPlayer(0).currentBet = 1;
+        let chipsBeforeBet = game.getPlayer(0).bb
+
+        // Try to bet one more chip than we have
+        await game.action(0, "raise", raise(chipsBeforeBet + 2));
+        expect(room.state.pot).toEqual(1.5);
+        expect(game.getPlayer(0).bb).toEqual(chipsBeforeBet);
+        expect(game.getPlayer(0).isTurn).toBeTruthy();
+
+        await game.action(0, "raise", raise(chipsBeforeBet + 1));
+        expect(game.getPlayer(0).bb).toEqual(0);
+        expect(room.state.pot).toEqual(1.5 + chipsBeforeBet);
+        expect(game.getPlayer(0).isTurn).toBeFalsy();
       });
     });
     
