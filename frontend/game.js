@@ -6,7 +6,7 @@ import poker_chip from './assets/poker_chip.png';
 import { READY } from "../messages/readystate";
 import PubSub from 'pubsub-js'
 import { GameState } from '../state/GameState';
-import { FOLD, CALL, raise } from "../messages/playeraction";
+import { FOLD, CALL, RAISE, raise } from "../messages/playeraction";
 
 export let game;
 let renderer;
@@ -194,7 +194,48 @@ class UserSprite extends Phaser.GameObjects.Container {
         this.orrientation = NONE;
     }
 
-    update(scene, player) {
+    dealCards(scene) { }
+
+    foldCards(scene) { 
+        this.makeMessage(scene, "Folded");
+    }
+
+    call(scene) {
+        this.makeMessage(scene, "Called");
+    }
+
+    raise(scene) {
+        this.makeMessage(scene, "Raised");
+     }
+
+    makeMessage(scene, message) {
+        let callMsg = scene.add.text(0, 0, message, {
+            fontFamily: 'Quicksand',
+            fontSize: '32px',
+            color: '#fff',
+            align: 'center'
+        }).setOrigin(0.5)
+            .setPadding(10)
+            .setStyle({ backgroundColor: "#111" })
+            .setVisible(true)
+            .on('pointerover', () => button.setStyle({ fill: "#f39c12" }))
+            .on('pointerout', () => button.setStyle({ fill: "#FFF" }));
+
+        this.add(callMsg);
+
+        var tween = scene.tweens.add({
+            targets: callMsg,
+            alpha: 0,
+            ease: 'linear',
+            delay: 1000,
+            duration: 500,
+            onComplete: function () {
+                callMsg.destroy();
+            }
+        });
+    }
+
+    updatePlayer(scene, player) {
         let name_str = player.id;
         let bb = player.bb;
         let hand = Array.from(player.hand.values())
@@ -218,13 +259,98 @@ class UserSprite extends Phaser.GameObjects.Container {
         this.name.text = name_str;
         this.num_chips_label.setText(bb + " bb");
 
-        // TODO: this deletion code crashes things when the screen is resized
-        if (this.card1 != null) {
-            this.card1.destroy();
+        let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
+
+        if (player.hand.length > 0 && this.oldPlayerState.hand.length == 0) {
+            this.dealCards(scene);
         }
-        if (this.card2 != null) {
-            this.card2.destroy();
+        if (!player.isTurn && this.oldPlayerState.isTurn) {
+            if (player.lastAction === FOLD) {
+                this.foldCards(scene);
+                this.deleteCards();
+            } else if (player.lastAction === CALL) {
+                this.call(scene);
+            } else if (player.lastAction === RAISE) {
+                this.raise(scene);
+            }
         }
+
+        if (hand.length > 1 && player.inRound && JSON.stringify(player.hand) !== JSON.stringify(this.oldPlayerState.hand)) {
+            this.deleteCards();
+
+            if (player.id == scene.userId) {
+                this.card1 = new CardSprite(scene, hand[0].suit, hand[0].value)
+                this.card2 = new CardSprite(scene, hand[1].suit, hand[1].value)
+            } else {
+                this.card1 = new CardBackSprite(scene);
+                this.card2 = new CardBackSprite(scene);
+            }
+
+            this.add(this.card1);
+            this.add(this.card2);
+
+            this.card1.setPosition(this.card1.card.width * this.card1.card.scale * 0.35, 0);
+            this.card2.setPosition(-this.card1.card.width * this.card1.card.scale * 0.35, 0);
+
+            this.card1.setAngle(3);
+            this.card2.setAngle(-3);
+
+            this.bringToTop(this.card2);
+            this.bringToTop(this.card1);
+        }
+
+        // Move the chips above or below the player
+        // if the orrientation has changed
+        if (newOrrientation != this.orrientation) {
+            let deltaY = 40;
+            if (newOrrientation == ABOVE) {
+                deltaY *= -1;
+            }
+            if (this.orrientation != NONE) {
+                deltaY *= 2;
+            }
+            this.orrientation = newOrrientation;
+
+            for (let i = 0; i < this.chips.length; i++) {
+                this.chips[i].y += deltaY
+            }
+            this.chip_label.y += deltaY;
+        }
+
+        for (let i = 0; i < this.chips.length; i++) {
+            this.chips[i].setVisible(scene.state.running);
+        }
+        this.chip_label.setVisible(scene.state.running);
+        this.chip_label.text = player.currentBet + ' BB'
+
+        this.oldPlayerState = player;
+    }
+
+    setNewPlayer(scene, player) {
+        let name_str = player.id;
+        let bb = player.bb;
+        let hand = Array.from(player.hand.values())
+        let isDealer = player.isDealer;
+        let active = player.isTurn;
+
+        this.active_user_sprite.setVisible(active);
+        this.inactive_user_sprite.setVisible(!active);
+
+        if (scene.state.running && !player.inRound) {
+            this.inactive_user_sprite.alpha = 0.5;
+        } else {
+            this.inactive_user_sprite.alpha = 1;
+        }
+
+        if (isDealer) {
+            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth * 0.75, this.y + 15)
+            this.dealerChit.setVisible(true);
+        }
+
+        this.name.text = name_str;
+        this.num_chips_label.setText(bb + " bb");
+
+        this.deleteCards();
 
         let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
 
@@ -273,6 +399,18 @@ class UserSprite extends Phaser.GameObjects.Container {
         }
         this.chip_label.setVisible(scene.state.running);
         this.chip_label.text = player.currentBet + ' BB'
+
+        this.oldPlayerState = player;
+    }
+
+    deleteCards() {
+        // TODO: this deletion code crashes things when the screen is resized
+        if (this.card1 != null) {
+            this.card1.destroy();
+        }
+        if (this.card2 != null) {
+            this.card2.destroy();
+        }
     }
 }
 
@@ -341,8 +479,8 @@ class PlayGame extends Phaser.Scene {
             player_sprites.push(new UserSprite(this, -1000, -1000, this.dealerChit));
         }
 
-        this.fold = this.drawButton("Fold", this.cameras.main.width * 0.7, this.cameras.main.height * 0.9, () => { this.room.send("fold", FOLD) });
-        this.call = this.drawButton("Call", this.fold.x + this.fold.width + 20, this.cameras.main.height * 0.9, () => { this.room.send("call", CALL) });
+        this.fold = this.drawButton("Fold", this.cameras.main.width * 0.7, this.cameras.main.height * 0.9, () => { this.room.send("fold", {}) });
+        this.call = this.drawButton("Call", this.fold.x + this.fold.width + 20, this.cameras.main.height * 0.9, () => { this.room.send("call", {}) });
         this.raise_btn = this.drawButton("Raise", this.call.x + this.call.width + 30, this.cameras.main.height * 0.9, () => { });
 
         this.fold.setVisible(false);
@@ -374,7 +512,7 @@ class PlayGame extends Phaser.Scene {
         this.betInput.height = this.bet_submit_btn.displayHeight;
         this.betInput.setTooltip("Bet size in big blinds");
         this.bet_submit_btn.on('pointerdown', () => {
-            this.room.send("raise", { amount: Number(this.betInput.text) })
+            this.room.send("raise", raise(Number(this.betInput.text)))
         });
         let visible = false;
         this.betInput.visible = visible;
@@ -385,6 +523,9 @@ class PlayGame extends Phaser.Scene {
             this.betInput.visible = visible;
             this.bet_submit_btn.visible = visible;
         });
+
+        let player_pos_map = new Map();
+        let player_states = new Map();
 
         PubSub.subscribe('state-change', (_, __) => {
             for (let player_sprite of player_sprites) {
@@ -406,7 +547,19 @@ class PlayGame extends Phaser.Scene {
                 const [x, y] = this.get_player_location(players.size, index);
 
                 player_sprites[index].setPosition(x, y);
-                player_sprites[index].update(this, players.get(key));
+
+                let player_state = JSON.stringify(players.get(key));
+                // Update the sprite when the player changes
+                if (player_pos_map.has(key) && player_pos_map.get(key) == index && player_states.get(key) != player_state) {
+                    player_sprites[index].updatePlayer(this, players.get(key));
+                    // Update the sprite when a new player is being used for the sprite
+                } else if (!player_pos_map.has(key) || player_pos_map.get(key) != index) {
+                    player_sprites[index].setNewPlayer(this, players.get(key));
+                }
+
+                player_pos_map.set(key, index);
+                player_states.set(key, player_state);
+
                 player_sprites[index++].setVisible(true);
             }
 

@@ -33,6 +33,9 @@ export class Player extends Schema  {
     @type("boolean")
     shouldShowHand: boolean;
 
+    @type("string")
+    lastAction: string;
+
     constructor(id: string, ready: boolean) {
         super();
 
@@ -46,6 +49,7 @@ export class Player extends Schema  {
         this.currentBet = 0;
         this.bestHand = new ArraySchema<Card>();
         this.shouldShowHand = false;
+        this.lastAction = "";
     }
 
     public get isReady(): boolean {

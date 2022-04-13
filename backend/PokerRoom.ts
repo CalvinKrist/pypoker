@@ -3,7 +3,7 @@ import { GameState } from "../state/GameState";
 import { Player } from "../state/Player";
 import { ArraySchema } from "@colyseus/schema";
 import { ReadyState } from "../messages/readystate";
-import { Fold, Call, Raise } from "../messages/playeraction";
+import { FOLD, CALL, RAISE, Raise } from "../messages/playeraction";
 import { Deck } from "../state/Deck";
 import * as HandComparer from "./HandComparer";
 import { Card } from "../state/Card";
@@ -275,6 +275,7 @@ export class PokerRoom extends Room<GameState> {
             player.hand = [];
             player.bestHand = [];
             player.shouldShowHand = false;
+            player.lastAction = "";
         })
 
         this.currentPlay = "";
@@ -307,6 +308,7 @@ export class PokerRoom extends Room<GameState> {
   
     private fold(id: string) {
         let player = this.state.player_map.get(id);
+        player.lastAction = FOLD;
         this.incrementPlayerTurn(player, true);
         this.transitionIfNeeded();
         if (this.currentPlay == id) {
@@ -335,14 +337,15 @@ export class PokerRoom extends Room<GameState> {
             //console.log("onMessage::ready")
         });
 
-        this.onMessage("fold", (client, message: Fold) => {
+        this.onMessage("fold", (client, message) => {
             this.fold(client.id);
 
             this.flush();
             //console.log("onMessage::fold")
         });
-        this.onMessage("call", (client, message: Call) => {
+        this.onMessage("call", (client, message) => {
             let player = this.state.player_map.get(client.id);
+            player.lastAction = CALL;
             player.bb -= this.currentBet - player.currentBet;
             this.state.pot += this.currentBet - player.currentBet;
             player.currentBet = this.currentBet;
@@ -354,14 +357,15 @@ export class PokerRoom extends Room<GameState> {
         });
         this.onMessage("raise", (client, message: Raise) => {
             if (message.amount < 1) {
-                //console.log("Bet less than minimum")
+                console.log("Bet less than minimum")
             } else if ((message.amount - this.currentBet) * 2 < this.lastRaise) {
-                //console.log("Must raise at least twice the last raise")
+                console.log("Must raise at least twice the last raise")
             } else {
                 this.lastRaise = message.amount - this.currentBet;
                 this.currentBet = message.amount;
 
                 let player = this.state.player_map.get(client.id);
+                player.lastAction = RAISE;
                 player.bb -= message.amount - player.currentBet;
                 this.state.pot += message.amount - player.currentBet;
                 player.currentBet = message.amount;
