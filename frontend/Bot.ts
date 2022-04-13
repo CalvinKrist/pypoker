@@ -58,6 +58,10 @@ export class Bot implements Player {
         fitAddon.fit();
     }
 
+    onServerError(error) {
+        throw Error("Not implemented")
+    }
+
     updateState(newState: any) {
         this.state = newState;
         console.log(this.debug)

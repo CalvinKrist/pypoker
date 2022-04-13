@@ -1,8 +1,9 @@
-import { Client, Delayed, Room } from "colyseus";
+import { Client, Room } from "colyseus";
 import { GameState } from "../state/GameState";
 import { Player } from "../state/Player";
 import { ArraySchema } from "@colyseus/schema";
 import { ReadyState } from "../messages/readystate";
+import { ErrorMessage } from "../messages/error";
 import { FOLD, CALL, RAISE, Raise } from "../messages/playeraction";
 import { Deck } from "../state/Deck";
 import * as HandComparer from "./HandComparer";
@@ -306,18 +307,28 @@ export class PokerRoom extends Room<GameState> {
         //console.log("deletePlayer")
     }
   
+    /*
+    Folds a player, even if they aren't the current player (such as if they leave the game)
+    */
     private fold(id: string) {
         let player = this.state.player_map.get(id);
         player.lastAction = FOLD;
-        this.incrementPlayerTurn(player, true);
-        this.transitionIfNeeded();
-        if (this.currentPlay == id) {
-            this.currentPlay = this.getNextPlayer(player).id;
+        if(this.getCurrentPlayer().id == id) {
+            this.incrementPlayerTurn(player, true); 
+        } else {
+            player.inRound = false;
         }
 
-        if (this.numPlayersInRound() == 1) {
+        if(this.numPlayersInRound() == 1) {
             this.transitionState(Gamestate.EndGame);
+        } else {
+            this.transitionIfNeeded();
+            if (this.currentPlay == id) {
+                // TODO: error handling when this.getNextPlayer(player) returns undefined
+                this.currentPlay = this.getNextPlayer(player).id;
+            }
         }
+
         //console.log("fold")
     }
 
@@ -338,43 +349,59 @@ export class PokerRoom extends Room<GameState> {
         });
 
         this.onMessage("fold", (client, message) => {
-            this.fold(client.id);
-
-            this.flush();
+            if(this.getCurrentPlayer().id == client.id) {
+                this.fold(client.id);
+                this.flush();
+            } else {
+                client.send("error", new ErrorMessage("Cannot fold until your turn."))
+            }
+            
             //console.log("onMessage::fold")
         });
         this.onMessage("call", (client, message) => {
-            let player = this.state.player_map.get(client.id);
-            player.lastAction = CALL;
-            player.bb -= this.currentBet - player.currentBet;
-            this.state.pot += this.currentBet - player.currentBet;
-            player.currentBet = this.currentBet;
-            this.incrementPlayerTurn(player)
-            this.transitionIfNeeded();
+            if(this.getCurrentPlayer().id == client.id) {
+                let player = this.state.player_map.get(client.id);
+                player.lastAction = CALL;
+                player.bb -= this.currentBet - player.currentBet;
+                this.state.pot += this.currentBet - player.currentBet;
+                player.currentBet = this.currentBet;
+                this.incrementPlayerTurn(player)
+                this.transitionIfNeeded();
 
-            this.flush();
+                this.flush();
+            } else {
+                client.send("error", new ErrorMessage("Cannot call until your turn."))
+            }
             //console.log("onMessage::call")
         });
         this.onMessage("raise", (client, message: Raise) => {
-            if (message.amount < 1) {
-                console.log("Bet less than minimum")
-            } else if ((message.amount - this.currentBet) * 2 < this.lastRaise) {
-                console.log("Must raise at least twice the last raise")
+            if(this.getCurrentPlayer().id == client.id) {
+                let requiredMessage = this.lastRaise * 0.5 + this.currentBet;
+                if (message.amount < 1) {
+                    console.log("Bet less than minimum")
+                    client.send("error", new ErrorMessage("Bet must be at least " + requiredMessage))
+                } else if (message.amount < requiredMessage) {
+                    console.log("Must raise at least twice the last raise")
+                    client.send("error", new ErrorMessage("Bet must be at least " + requiredMessage))
+                } else {
+                    this.lastRaise = message.amount - this.currentBet;
+                    this.currentBet = message.amount;
+
+                    let player = this.state.player_map.get(client.id);
+                    player.lastAction = RAISE;
+                    player.bb -= message.amount - player.currentBet;
+                    this.state.pot += message.amount - player.currentBet;
+                    player.currentBet = message.amount;
+
+                    this.incrementPlayerTurn(player)
+                    this.currentPlay = player.id;
+
+                    this.flush();
+                }
             } else {
-                this.lastRaise = message.amount - this.currentBet;
-                this.currentBet = message.amount;
-
-                let player = this.state.player_map.get(client.id);
-                player.lastAction = RAISE;
-                player.bb -= message.amount - player.currentBet;
-                this.state.pot += message.amount - player.currentBet;
-                player.currentBet = message.amount;
-
-                this.incrementPlayerTurn(player)
-                this.currentPlay = player.id;
+                client.send("error", new ErrorMessage("Cannot raise until your turn."))
             }
 
-            this.flush();
             //console.log("onMessage::raise")
         });
 
@@ -422,12 +449,7 @@ export class PokerRoom extends Room<GameState> {
             }
         } else if (this.state.running && this.state.player_map.get(client.id).inRound) {
             this.toDelete.push(client.id);
-
-            if(this.state.player_map.get(client.id).isTurn) {
-                this.fold(client.id);
-            } else {
-                this.state.player_map.get(client.id).inRound = false;
-            }
+            this.fold(client.id);
         } else {
             this.deletePlayer(client.id);
         }

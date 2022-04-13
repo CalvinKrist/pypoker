@@ -3,6 +3,7 @@ import { GameState } from "../state/GameState";
 import { createGame } from "./game";
 import { Player } from "./Player";
 import { RandomBot } from "./RandomBot";
+import { ErrorMessage } from "../messages/error"
 
 async function joinRoom(playerPromise: Promise<Player>) {
     const client = new Client('ws://localhost:2567');
@@ -21,6 +22,10 @@ async function joinRoom(playerPromise: Promise<Player>) {
 
     room.onMessage("state-update", (newState) => {
         player.updateState(newState);
+    });
+
+    room.onMessage("error", (errorMessage: ErrorMessage) => {
+        player.onServerError(errorMessage);
     });
 }
 

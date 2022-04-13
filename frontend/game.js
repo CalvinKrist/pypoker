@@ -415,6 +415,10 @@ class UserSprite extends Phaser.GameObjects.Container {
 }
 
 
+/*
+This implementes Player, but because this is JS and not TS 
+the 'implements Player' syntax doesn't work
+*/
 class PlayGame extends Phaser.Scene {
     constructor() {
         super("PlayGame");
@@ -783,6 +787,35 @@ class PlayGame extends Phaser.Scene {
 
         let player_loc = mapping[num_players][player_index];
         return [this.cameras.main.worldView.x + this.cameras.main.width * player_loc[0], this.cameras.main.worldView.y + this.cameras.main.height * player_loc[1]];
+    }
+
+    onServerError(errorMessage) {
+        const screenCenterX = this.cameras.main.worldView.x + this.cameras.main.width / 2;
+        const screenCenterY = this.cameras.main.worldView.y + this.cameras.main.height / 2;
+
+        let errorTxt = this.add.text(screenCenterX, screenCenterY, errorMessage.error, {
+            fontFamily: 'Quicksand',
+            fontSize: '32px',
+            color: '#ff0000',
+            align: 'center',
+            stroke: "#000",
+            fontWeight: 'bold',
+            strokeThickness: 8
+        }).setOrigin(0.5)
+            .setPadding(10)
+            .setStyle({ backgroundColor: "#111" })
+            .setVisible(true);
+
+        var tween = this.tweens.add({
+            targets: errorTxt,
+            alpha: 0,
+            ease: 'linear',
+            delay: 1000,
+            duration: 500,
+            onComplete: function () {
+                errorTxt.destroy();
+            }
+        });
     }
 
 }
