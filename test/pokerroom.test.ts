@@ -22,6 +22,11 @@ class Game {
       const [ c, message ] = await this.room.waitForMessage("ready");
     }
   }
+
+  async action(client_idx: number, action: string, message: any) {
+    this.clients[client_idx].send(action, message);
+    return await this.room.waitForMessage(action);
+  }
 }
 
 async function createRoomWithClients(colyseus: ColyseusTestServer, num_clients: number) {
@@ -132,8 +137,7 @@ describe("testing your Colyseus app", () => {
         let game = await createRoomWithClients(colyseus, num_clients);
         await game.ready();
 
-        game.clients[0].send("fold", {});
-        const [ c, message ] = await game.room.waitForMessage("fold");
+        const [ c, message ] = await game.action(0, "fold", {});
 
         expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeFalsy();
         expect(game.room.state.player_map.get(game.clients[0].sessionId).inRound).toBeFalsy();
@@ -147,8 +151,7 @@ describe("testing your Colyseus app", () => {
 
       expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeTruthy();
 
-      game.clients[3].send("fold", {});
-      let [ c, message ] = await game.room.waitForMessage("fold");
+      const [ c, message ] = await game.action(3, "fold", {});
 
       expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeFalsy();
       expect(game.room.state.player_map.get(game.clients[3].sessionId).inRound).toBeFalsy();
@@ -162,8 +165,7 @@ describe("testing your Colyseus app", () => {
 
       game.room.state.player_map.get(game.clients[0].sessionId).inRound = false;
 
-      game.clients[3].send("fold", {});
-      let [ c, message ] = await game.room.waitForMessage("fold");
+      const [ c, message ] = await game.action(3, "fold", {});
 
       expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeFalsy();
       expect(game.room.state.player_map.get(game.clients[3].sessionId).inRound).toBeFalsy();
@@ -177,17 +179,12 @@ describe("testing your Colyseus app", () => {
       let game = await createRoomWithClients(colyseus, num_clients);
       await game.ready();
 
-      game.clients[0].send("fold", {});
-      let [ c, message ] = await game.room.waitForMessage("fold");
-      game.clients[1].send("fold", {});
-      [ c, message ] = await game.room.waitForMessage("fold");
+      let [ c, message ] = await game.action(0, "fold", {});
+      [ c, message ] = await game.action(1, "fold", {});
 
       expect(game.room.gameState).toEqual(Gamestate.EndGame);
 
-      for(let client of game.clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await game.room.waitForMessage("ready");
-      }
+      await game.ready();
 
       expect(game.room.gameState).toEqual(Gamestate.Preflop);
     });
@@ -200,10 +197,8 @@ describe("testing your Colyseus app", () => {
 
       expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeTruthy();
 
-      game.clients[0].send("fold", {});
-      let [ c, message ] = await game.room.waitForMessage("fold");
-      game.clients[1].send("fold", {});
-      [ c, message ] = await game.room.waitForMessage("fold");
+      let [ c, message ] = await game.action(0, "fold", {});
+      [ c, message ] = await game.action(1, "fold", {});
 
       for(let client of game.clients) {
         client.send("ready", READY);
@@ -220,20 +215,14 @@ describe("testing your Colyseus app", () => {
       let game = await createRoomWithClients(colyseus, num_clients);
       await game.ready();
 
-      game.clients[0].send("fold", {});
-      let [ c, message ] = await game.room.waitForMessage("fold");
-      game.clients[1].send("fold", {});
-      [ c, message ] = await game.room.waitForMessage("fold");
+      let [ c, message ] = await game.action(0, "fold", {});
+      [ c, message ] = await game.action(1, "fold", {});
 
-      for(let client of game.clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await game.room.waitForMessage("ready");
-      }
+      await game.ready();
 
       expect(game.room.state.player_map.get(game.clients[1].sessionId).isTurn).toBeTruthy();
 
-      game.clients[1].send("fold", {});
-      [ c, message ] = await game.room.waitForMessage("fold");
+      [ c, message ] = await game.action(1, "fold", {});
 
       expect(game.room.state.player_map.get(game.clients[1].sessionId).isTurn).toBeFalsy();
       expect(game.room.state.player_map.get(game.clients[1].sessionId).inRound).toBeFalsy();
@@ -255,8 +244,7 @@ describe("testing your Colyseus app", () => {
 
       let raiseAmt = 10;
 
-      clients[0].send("raise", raise(raiseAmt));
-      let [ c, message ] = await room.waitForMessage("raise");
+      let [ c, message ] = await game.action(0, "raise", raise(raiseAmt));
 
       expect(room.state.player_map.get(clients[0].sessionId).bb).toEqual(startingBB - raiseAmt);
       expect(room.state.pot).toEqual(startingPot + raiseAmt);
@@ -277,13 +265,11 @@ describe("testing your Colyseus app", () => {
 
       let raiseAmt = 10;
 
-      clients[0].send("raise", raise(raiseAmt));
-      let [ c, message ] = await room.waitForMessage("raise");
+      let [ c, message ] = await game.action(0, "raise", raise(raiseAmt));
 
       let startingPot =  room.state.pot;
 
-      clients[1].send("call", {});
-      [ c, message ] = await room.waitForMessage("call");
+      [ c, message ] = await game.action(1, "call", {});
 
       expect(room.state.player_map.get(clients[1].sessionId).bb).toEqual(startingBB - raiseAmt + startingBet);
       expect(room.state.pot).toEqual(startingPot + raiseAmt - startingBet);
@@ -343,8 +329,7 @@ describe("testing your Colyseus app", () => {
         }
       }
 
-      clients[0].send("fold", {});
-      let [ c, message ] = await room.waitForMessage("fold");
+      let [ c, message ] = await game.action(0, "fold", {});
 
       expect(room.gameState).toEqual(Gamestate.EndGame);
 
@@ -355,14 +340,17 @@ describe("testing your Colyseus app", () => {
 
     describe("Minimum raising rules are correct", () => {
       it("test case 1", async() => {
-        let num_clients = 2;
+        let num_clients = 3;
         
         let game = await createRoomWithClients(colyseus, num_clients);
         await game.ready();
         let room = game.room;
         let clients = game.clients;
   
-        
+        // Assert that the first client cannot raise less than 1bb
+        expect(clients[0].isTurn).toBeTruthy();
+
+
       });
     });
     
