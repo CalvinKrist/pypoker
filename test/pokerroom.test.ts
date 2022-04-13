@@ -7,6 +7,33 @@ import {Gamestate} from "../backend/PokerRoom";
 
 console.warn = function() {}
 
+class Game {
+  room: PokerRoom;
+  clients: any;
+
+  constructor(room: PokerRoom, clients: any) {
+    this.room = room;
+    this.clients = clients;
+  }
+
+  async ready() {
+    for(let client of this.clients) {
+      client.send("ready", READY);
+      const [ c, message ] = await this.room.waitForMessage("ready");
+    }
+  }
+}
+
+async function createRoomWithClients(colyseus: ColyseusTestServer, num_clients: number) {
+  const room = await colyseus.createRoom("poker", {}) as PokerRoom;
+  let clients = [];
+  for(let i = 0; i < num_clients; i++) {
+    clients.push(await colyseus.connectTo(room));
+  }
+
+  return new Game(room, clients)
+}
+
 describe("testing your Colyseus app", () => {
     let colyseus: ColyseusTestServer;
   
@@ -75,223 +102,151 @@ describe("testing your Colyseus app", () => {
           client.send("ready", READY);
           const [ c, message ] = await room.waitForMessage("ready");
         }
-
-        expect(room.gameState).toEqual(Gamestate.Preflop);
       }
     });
 
     it("2/3 players: when the round starts, player 0 is the dealer and has the turn", async() => {
       let num_client_cases = [2, 3];
-      for(let num_clients of num_client_cases) {        
-        const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-        let clients = [];
-        for(let i = 0; i < num_clients; i++) {
-          clients.push(await colyseus.connectTo(room));
-        }
+      for(let num_clients of num_client_cases) { 
+        let game = await createRoomWithClients(colyseus, num_clients);
+        await game.ready();
 
-        for(let client of clients) {
-          client.send("ready", READY);
-          const [ c, message ] = await room.waitForMessage("ready");
-        }
-
-        expect(room.state.player_map.get(clients[0].sessionId).isTurn).toBeTruthy();
-        expect(room.state.player_map.get(clients[0].sessionId).isDealer).toBeTruthy();
+        expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeTruthy();
+        expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeTruthy();
       }
     });
 
     it("when the round starts, player 0 is the dealer and does not have the turn", async() => {
       let num_clients = 4;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
 
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
-
-      expect(room.state.player_map.get(clients[0].sessionId).isDealer).toBeTruthy();
-      expect(room.state.player_map.get(clients[0].sessionId).isTurn).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeTruthy();
+      expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeFalsy();
     });
 
     it("when a player folds they leave the round and their turn ends", async() => {
       let num_client_cases = [2];
       for(let num_clients of num_client_cases) {        
-        const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-        let clients = [];
-        for(let i = 0; i < num_clients; i++) {
-          clients.push(await colyseus.connectTo(room));
-        }
+        let game = await createRoomWithClients(colyseus, num_clients);
+        await game.ready();
 
-        for(let client of clients) {
-          client.send("ready", READY);
-          const [ c, message ] = await room.waitForMessage("ready");
-        }
+        game.clients[0].send("fold", {});
+        const [ c, message ] = await game.room.waitForMessage("fold");
 
-        clients[0].send("fold", {});
-        const [ c, message ] = await room.waitForMessage("fold");
-
-        expect(room.state.player_map.get(clients[0].sessionId).isTurn).toBeFalsy();
-        expect(room.state.player_map.get(clients[0].sessionId).inRound).toBeFalsy();
+        expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeFalsy();
+        expect(game.room.state.player_map.get(game.clients[0].sessionId).inRound).toBeFalsy();
       }
     });
 
     it("when a player folds play moves to the next player", async() => {
       let num_clients = 4;
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
 
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
+      expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeTruthy();
 
-      expect(room.state.player_map.get(clients[3].sessionId).isTurn).toBeTruthy();
+      game.clients[3].send("fold", {});
+      let [ c, message ] = await game.room.waitForMessage("fold");
 
-      clients[3].send("fold", {});
-      let [ c, message ] = await room.waitForMessage("fold");
-
-      expect(room.state.player_map.get(clients[3].sessionId).isTurn).toBeFalsy();
-      expect(room.state.player_map.get(clients[3].sessionId).inRound).toBeFalsy();
-      expect(room.state.player_map.get(clients[0].sessionId).isTurn).toBeTruthy();   
+      expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[3].sessionId).inRound).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeTruthy();   
     });
 
     it("when a player folds and the next player is skipped, play moves to the next player still", async() => {
       let num_clients = 4;
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
 
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
+      game.room.state.player_map.get(game.clients[0].sessionId).inRound = false;
 
-      room.state.player_map.get(clients[0].sessionId).inRound = false;
+      game.clients[3].send("fold", {});
+      let [ c, message ] = await game.room.waitForMessage("fold");
 
-      clients[3].send("fold", {});
-      let [ c, message ] = await room.waitForMessage("fold");
-
-      expect(room.state.player_map.get(clients[3].sessionId).isTurn).toBeFalsy();
-      expect(room.state.player_map.get(clients[3].sessionId).inRound).toBeFalsy();
-      expect(room.state.player_map.get(clients[0].sessionId).isTurn).toBeFalsy();
-      expect(room.state.player_map.get(clients[1].sessionId).isTurn).toBeTruthy();
+      expect(game.room.state.player_map.get(game.clients[3].sessionId).isTurn).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[3].sessionId).inRound).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[0].sessionId).isTurn).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[1].sessionId).isTurn).toBeTruthy();
     });
 
     it("when a new round ends and everyone readys up, we start a new round", async() => {
       let num_clients = 3;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
 
-      for(let client of clients) {
+      game.clients[0].send("fold", {});
+      let [ c, message ] = await game.room.waitForMessage("fold");
+      game.clients[1].send("fold", {});
+      [ c, message ] = await game.room.waitForMessage("fold");
+
+      expect(game.room.gameState).toEqual(Gamestate.EndGame);
+
+      for(let client of game.clients) {
         client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
+        const [ c, message ] = await game.room.waitForMessage("ready");
       }
 
-      clients[0].send("fold", {});
-      let [ c, message ] = await room.waitForMessage("fold");
-      clients[1].send("fold", {});
-      [ c, message ] = await room.waitForMessage("fold");
-
-      expect(room.gameState).toEqual(Gamestate.EndGame);
-
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
-
-      expect(room.gameState).toEqual(Gamestate.Preflop);
+      expect(game.room.gameState).toEqual(Gamestate.Preflop);
     });
 
     it("when a new round starts, the dealer position moves", async() => {
       let num_clients = 3;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
 
-      for(let client of clients) {
+      expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeTruthy();
+
+      game.clients[0].send("fold", {});
+      let [ c, message ] = await game.room.waitForMessage("fold");
+      game.clients[1].send("fold", {});
+      [ c, message ] = await game.room.waitForMessage("fold");
+
+      for(let client of game.clients) {
         client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
+        const [ c, message ] = await game.room.waitForMessage("ready");
       }
 
-      expect(room.state.player_map.get(clients[0].sessionId).isDealer).toBeTruthy();
-
-      clients[0].send("fold", {});
-      let [ c, message ] = await room.waitForMessage("fold");
-      clients[1].send("fold", {});
-      [ c, message ] = await room.waitForMessage("fold");
-
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
-
-      expect(room.state.player_map.get(clients[0].sessionId).isDealer).toBeFalsy();
-      expect(room.state.player_map.get(clients[1].sessionId).isDealer).toBeTruthy();
+      expect(game.room.state.player_map.get(game.clients[0].sessionId).isDealer).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[1].sessionId).isDealer).toBeTruthy();
     });
 
     it("when a new round starts and a player folds, play moves to the next player", async() => {
       let num_clients = 3;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
 
-      for(let client of clients) {
+      game.clients[0].send("fold", {});
+      let [ c, message ] = await game.room.waitForMessage("fold");
+      game.clients[1].send("fold", {});
+      [ c, message ] = await game.room.waitForMessage("fold");
+
+      for(let client of game.clients) {
         client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
+        const [ c, message ] = await game.room.waitForMessage("ready");
       }
 
-      clients[0].send("fold", {});
-      let [ c, message ] = await room.waitForMessage("fold");
-      clients[1].send("fold", {});
-      [ c, message ] = await room.waitForMessage("fold");
+      expect(game.room.state.player_map.get(game.clients[1].sessionId).isTurn).toBeTruthy();
 
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
+      game.clients[1].send("fold", {});
+      [ c, message ] = await game.room.waitForMessage("fold");
 
-      expect(room.state.player_map.get(clients[1].sessionId).isTurn).toBeTruthy();
-
-      clients[1].send("fold", {});
-      [ c, message ] = await room.waitForMessage("fold");
-
-      expect(room.state.player_map.get(clients[1].sessionId).isTurn).toBeFalsy();
-      expect(room.state.player_map.get(clients[1].sessionId).inRound).toBeFalsy();
-      expect(room.state.player_map.get(clients[2].sessionId).isTurn).toBeTruthy();
+      expect(game.room.state.player_map.get(game.clients[1].sessionId).isTurn).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[1].sessionId).inRound).toBeFalsy();
+      expect(game.room.state.player_map.get(game.clients[2].sessionId).isTurn).toBeTruthy();
     });
 
     it("when a player raises, they put money in the pot", async() => {
       let num_clients = 3;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
-
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
+      let room = game.room;
+      let clients = game.clients;
 
       let startingBB = room.state.player_map.get(clients[0].sessionId).bb;
       let startingPot =  room.state.pot;
@@ -312,16 +267,10 @@ describe("testing your Colyseus app", () => {
     it("when a player calls a raise, they put money in the pot", async() => {
       let num_clients = 3;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
-
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
+      let room = game.room;
+      let clients = game.clients;
 
       let startingBB = room.state.player_map.get(clients[1].sessionId).bb;
       let startingBet = room.state.player_map.get(clients[1].sessionId).currentBet;
@@ -343,16 +292,10 @@ describe("testing your Colyseus app", () => {
     it("when a player joins mid-round, they sit left of the dealer", async() => {
       let num_clients = 3;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
-
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
+      let room = game.room;
+      let clients = game.clients;
 
       let newClient = await colyseus.connectTo(room);
 
@@ -368,16 +311,10 @@ describe("testing your Colyseus app", () => {
     it("when players call it all the way, then the players must show their hands", async() => {
       let num_clients = 2;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
-
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
+      let room = game.room;
+      let clients = game.clients;
 
       for(let i = 0; i < 4; i++) {
         for(let client of clients) {
@@ -394,16 +331,10 @@ describe("testing your Colyseus app", () => {
     it("when players fold, then the players don't need to their hands", async() => {
       let num_clients = 2;
       
-      const room = await colyseus.createRoom("poker", {}) as PokerRoom;
-      let clients = [];
-      for(let i = 0; i < num_clients; i++) {
-        clients.push(await colyseus.connectTo(room));
-      }
-
-      for(let client of clients) {
-        client.send("ready", READY);
-        const [ c, message ] = await room.waitForMessage("ready");
-      }
+      let game = await createRoomWithClients(colyseus, num_clients);
+      await game.ready();
+      let room = game.room;
+      let clients = game.clients;
 
       for(let i = 0; i < 3; i++) {
         for(let client of clients) {
@@ -420,6 +351,19 @@ describe("testing your Colyseus app", () => {
       for(let player of room.state.player_map.values()) {
         expect(player.shouldShowHand).toBeFalsy();
       }
+    });
+
+    describe("Minimum raising rules are correct", () => {
+      it("test case 1", async() => {
+        let num_clients = 2;
+        
+        let game = await createRoomWithClients(colyseus, num_clients);
+        await game.ready();
+        let room = game.room;
+        let clients = game.clients;
+  
+        
+      });
     });
     
   });
