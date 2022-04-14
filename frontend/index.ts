@@ -1,26 +1,28 @@
 import { Client, Room } from "colyseus.js";
 import { GameState } from "../state/GameState";
-import { createGame } from "./game";
+const {createGame} = require("./game");
 import { Player } from "./Player";
 import { RandomBot } from "./RandomBot";
 import { ErrorMessage } from "../messages/error"
 
 async function joinRoom(playerPromise: Promise<Player>) {
-    const client = new Client('ws://localhost:2567');
+    var HOST = location.origin.replace(/^http/, 'ws');
+    console.log("Client connecting on " + HOST)
+    const client = new Client(HOST);
 
     // Need to wait before we join the room, or we may miss the
     // first message with our updateed state
-    let player = await playerPromise;
+    let player: Player = await playerPromise;
 
-    const room: Room<GameState> = await client.joinOrCreate<GameState>("poker");
+    const room: Room = await client.joinOrCreate<GameState>("poker");
     player.setUserId(room.sessionId);
     player.setRoom(room);
 
-    room.state.onChange = (changes) => {
+    room.state.onChange = (changes: any) => {
         player.onStateChanges(changes);
     };
 
-    room.onMessage("state-update", (newState) => {
+    room.onMessage("state-update", (newState: any) => {
         player.updateState(newState);
     });
 
@@ -55,5 +57,14 @@ function startGame() {
     }));
 }
 
-window.startGame = startGame; // typescript shows an error here but it can be ignored
-window.startRandomBot = startRandomBot; // typescript shows an error here but it can be ignored
+declare global {
+    interface Window { 
+        startGame: any; 
+        startRandomBot: any;
+    }
+}
+
+console.log("in my index!!!")
+window.startGame = startGame;
+window.startRandomBot = startRandomBot;
+

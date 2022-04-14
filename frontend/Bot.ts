@@ -2,6 +2,7 @@ import { Player } from "./Player";
 import { Room } from "colyseus.js";
 import { Terminal } from "xterm";
 import { FitAddon } from 'xterm-addon-fit';
+import { ErrorMessage } from "../messages/error"
 
 const fitAddon = new FitAddon();
 
@@ -10,7 +11,7 @@ function onSize() {
 }
 window.addEventListener('resize', onSize, false);
 
-function download(filename, text) {
+function downloadLog(filename: string, text: string) {
     var element = document.createElement('a');
     element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
     element.setAttribute('download', filename);
@@ -37,7 +38,7 @@ export class Bot implements Player {
     
         let downloadBtn = document.createElement('button');
         downloadBtn.innerText = "Download Log";
-        downloadBtn.onclick = () => {download('log.txt', this.logFile)};
+        downloadBtn.onclick = () => {downloadLog('log.txt', this.logFile)};
         document.body.appendChild(downloadBtn);
 
         let d1 = document.createElement('div');
@@ -58,7 +59,7 @@ export class Bot implements Player {
         fitAddon.fit();
     }
 
-    onServerError(error) {
+    onServerError(error: ErrorMessage) {
         throw Error("Not implemented")
     }
 
@@ -81,7 +82,7 @@ export class Bot implements Player {
         this.room = room;
     }
 
-    log(text, print: boolean = true) {
+    log(text: string, print: boolean = true) {
         if(print) {
             this.terminal.writeln(text);
             console.log(text);

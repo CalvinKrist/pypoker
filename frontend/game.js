@@ -5,6 +5,7 @@ import card_back from './assets/card_back.png';
 import poker_chip from './assets/poker_chip.png';
 import { READY } from "../messages/readystate";
 import PubSub from 'pubsub-js'
+import Phaser from "./phaser.min.js";
 import { GameState } from '../state/GameState';
 import { FOLD, CALL, RAISE, raise } from "../messages/playeraction";
 
