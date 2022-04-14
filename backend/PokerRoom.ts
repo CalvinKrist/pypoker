@@ -309,6 +309,11 @@ export class PokerRoom extends Room<GameState> {
             this.gameState = Gamestate.Preround;
             this.reset();
             this.transitionState(Gamestate.Preflop);
+        } if(this.gameState == Gamestate.Preflop && nextState == Gamestate.Preflop) {
+            console.log("Preflop --> Preflop: resetting instead.");
+            this.reset();
+            this.flush();
+            this.broadcast("error", new ErrorMessage("Server error detected: resetting round."))
         } else {
             throw new Error("INVALID TRANSITION: " + this.gameState + " --> " + nextState);
         }
@@ -560,4 +565,6 @@ Feature list:
 - verify that people aren't raising more chips than they have
 - create some visual indicator as to what action a player took
 - better show when it's the current player's turn
+- if every calls in the river, show cards
+- when we are all-in, show player cards
 */
