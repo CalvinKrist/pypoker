@@ -1,7 +1,7 @@
 import { getPairs, getHighCard, getSet, getStraight, getFlush, getFullHouse, getFourOfAKind, compareHand, HandType, getUniqueHighCard, getPlayersBestHand } from "../backend/HandComparer";
 import { Card } from "../state/Card"
 
-describe("testing your Colyseus app", () => {
+describe("testing hand comparison logic", () => {
 
     it("getPairs returns empty array when no pairs", async () => {
         let hand = [];

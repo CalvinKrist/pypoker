@@ -85,7 +85,11 @@ export class PokerRoom extends Room<GameState> {
     }
 
     private numPlayersInRound() {
-        return Array.from(this.state.player_map.values()).filter(player => player.inRound).length;
+        return this.getPlayersInRound().length;
+    }
+
+    private getPlayersInRound(): Array<Player> {
+        return Array.from(this.state.player_map.values()).filter(player => player.inRound);
     }
 
     private numPlayersAllIn() {
@@ -135,6 +139,9 @@ export class PokerRoom extends Room<GameState> {
 
     private allInSequence() {
         this.disablePlayerTurns();
+        for(let player of this.getPlayersInRound()) {
+            player.shouldShowHand = true;
+        }
 
         if (this.gameState == Gamestate.Preflop) {
             this.transitionState(Gamestate.Flop);
@@ -309,7 +316,7 @@ export class PokerRoom extends Room<GameState> {
             this.gameState = Gamestate.Preround;
             this.reset();
             this.transitionState(Gamestate.Preflop);
-        } if(this.gameState == Gamestate.Preflop && nextState == Gamestate.Preflop) {
+        } else if(this.gameState == Gamestate.Preflop && nextState == Gamestate.Preflop) {
             console.log("Preflop --> Preflop: resetting instead.");
             this.reset();
             this.flush();

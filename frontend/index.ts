@@ -23,6 +23,7 @@ async function joinRoom(playerPromise: Promise<Player>) {
     };
 
     room.onMessage("state-update", (newState: any) => {
+        console.log(newState);
         player.updateState(newState);
     });
 

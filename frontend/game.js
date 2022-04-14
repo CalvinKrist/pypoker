@@ -276,10 +276,10 @@ class UserSprite extends Phaser.GameObjects.Container {
             }
         }
 
-        if (hand.length > 1 && player.inRound && JSON.stringify(player.hand) !== JSON.stringify(this.oldPlayerState.hand)) {
+        if (hand.length > 1 && player.inRound && JSON.stringify(player.hand) !== JSON.stringify(this.oldPlayerState.hand) || player.shouldShowHand != this.oldPlayerState.shouldShowHand) {
             this.deleteCards();
 
-            if (player.id == scene.userId) {
+            if (player.id == scene.userId || player.shouldShowHand) {
                 this.card1 = new CardSprite(scene, hand[0].suit, hand[0].value)
                 this.card2 = new CardSprite(scene, hand[1].suit, hand[1].value)
             } else {
