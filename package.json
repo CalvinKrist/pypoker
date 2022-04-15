@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "start:backend": "nodemon --watch src -e ts --exec \"ts-node backend/index.ts\"",
+    "start:dev-frontend": "parcel frontend/devIndex.html",
+    "start-dev": "concurrently --kill-others-on-fail --handle-input \"npm run start:backend\" \"npm run start:dev-frontend\"",
     "test": "jest --coverage --runInBand",
     "clean": "rimraf ./backend/dist",
     "start": "npm run start:backend",

@@ -105,6 +105,23 @@ class CardBase extends Phaser.GameObjects.Container {
         this.add(this.shadow);
         this.bringToTop(this.card);
     }
+
+    setDisplayHeight(height) {
+        this.shadow.displayHeight = height;
+        this.card.displayHeight = height;
+    }
+
+    setHeight(height) {
+        this.shadow.height = height;
+        this.card.height = height;
+    }
+
+    setScale(s) {
+        console.log("old scale: " + this.shadow.scale);
+        console.log("new scale: " + s)
+        this.shadow.scale = s;
+        this.card.scale = s;
+    }
 }
 
 class CardSprite extends CardBase {
@@ -138,14 +155,16 @@ class UserSprite extends Phaser.GameObjects.Container {
         this.active_user_sprite = scene.add.sprite(0, 0, "active_user_icon");
         this.inactive_user_sprite = scene.add.sprite(0, 0, "user_icon");
 
-        this.active_user_sprite.setScale(scene.cameras.main.height * 0.000135);
-        this.inactive_user_sprite.setScale(scene.cameras.main.height * 0.000135);
+        // Scale the user sprite to 17.5% of the camera's height
+        let scaleFactor =  scene.cameras.main.height / this.active_user_sprite.displayHeight;
+        this.active_user_sprite.setScale(this.active_user_sprite.scale * scaleFactor * 0.175);
+        this.inactive_user_sprite.setScale(this.inactive_user_sprite.scale * scaleFactor * 0.175);
         this.active_user_sprite.setVisible(false);
 
         this.add(this.active_user_sprite);
         this.add(this.inactive_user_sprite);
 
-        this.name = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 6, name_str, {
+        this.name = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 10, name_str, {
             fontFamily: 'Quicksand',
             fontSize: '16px',
             color: '#000',
@@ -153,7 +172,7 @@ class UserSprite extends Phaser.GameObjects.Container {
         }).setOrigin(0.5);
         this.add(this.name);
 
-        this.num_chips_label = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 28, bb + " bb", {
+        this.num_chips_label = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 32, bb + " bb", {
             fontFamily: 'Quicksand',
             fontSize: '16px',
             color: '#000',
@@ -197,7 +216,7 @@ class UserSprite extends Phaser.GameObjects.Container {
 
     dealCards(scene) { }
 
-    foldCards(scene) { 
+    foldCards(scene) {
         this.makeMessage(scene, "Folded");
     }
 
@@ -207,7 +226,7 @@ class UserSprite extends Phaser.GameObjects.Container {
 
     raise(scene) {
         this.makeMessage(scene, "Raised");
-     }
+    }
 
     makeMessage(scene, message) {
         let callMsg = scene.add.text(0, 0, message, {
@@ -276,28 +295,10 @@ class UserSprite extends Phaser.GameObjects.Container {
             }
         }
 
-        if (hand.length > 1 && player.inRound && JSON.stringify(player.hand) !== JSON.stringify(this.oldPlayerState.hand) || player.shouldShowHand != this.oldPlayerState.shouldShowHand) {
+        if (hand.length > 1 && player.inRound && JSON.stringify(player.hand) !== JSON.stringify(this.oldPlayerState.hand) ||
+            player.shouldShowHand != this.oldPlayerState.shouldShowHand) {
             this.deleteCards();
-
-            if (player.id == scene.userId || player.shouldShowHand) {
-                this.card1 = new CardSprite(scene, hand[0].suit, hand[0].value)
-                this.card2 = new CardSprite(scene, hand[1].suit, hand[1].value)
-            } else {
-                this.card1 = new CardBackSprite(scene);
-                this.card2 = new CardBackSprite(scene);
-            }
-
-            this.add(this.card1);
-            this.add(this.card2);
-
-            this.card1.setPosition(this.card1.card.width * this.card1.card.scale * 0.35, 0);
-            this.card2.setPosition(-this.card1.card.width * this.card1.card.scale * 0.35, 0);
-
-            this.card1.setAngle(3);
-            this.card2.setAngle(-3);
-
-            this.bringToTop(this.card2);
-            this.bringToTop(this.card1);
+            this.drawCards(scene, player);
         }
 
         // Move the chips above or below the player
@@ -356,25 +357,7 @@ class UserSprite extends Phaser.GameObjects.Container {
         let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
 
         if (hand.length > 1 && player.inRound) {
-            if (player.id == scene.userId) {
-                this.card1 = new CardSprite(scene, hand[0].suit, hand[0].value)
-                this.card2 = new CardSprite(scene, hand[1].suit, hand[1].value)
-            } else {
-                this.card1 = new CardBackSprite(scene);
-                this.card2 = new CardBackSprite(scene);
-            }
-
-            this.add(this.card1);
-            this.add(this.card2);
-
-            this.card1.setPosition(this.card1.card.width * this.card1.card.scale * 0.35, 0);
-            this.card2.setPosition(-this.card1.card.width * this.card1.card.scale * 0.35, 0);
-
-            this.card1.setAngle(3);
-            this.card2.setAngle(-3);
-
-            this.bringToTop(this.card2);
-            this.bringToTop(this.card1);
+            this.drawCards(scene, player);
         }
 
         // Move the chips above or below the player
@@ -402,6 +385,36 @@ class UserSprite extends Phaser.GameObjects.Container {
         this.chip_label.text = player.currentBet + ' BB'
 
         this.oldPlayerState = player;
+    }
+
+    drawCards(scene, player) {
+        if (player.id == scene.userId) {
+            this.card1 = new CardSprite(scene, player.hand[0].suit, player.hand[0].value)
+            this.card2 = new CardSprite(scene, player.hand[1].suit, player.hand[1].value)
+        } else {
+            this.card1 = new CardBackSprite(scene);
+            this.card2 = new CardBackSprite(scene);
+        }
+
+        // Scale the card to 80% of the user sprite height
+        let scaleFactor =  this.active_user_sprite.displayHeight / this.card1.card.displayHeight;
+        this.card1.setScale(scaleFactor * this.card1.card.scale * 0.7);
+        this.card2.setScale(scaleFactor * this.card2.card.scale * 0.7);
+
+        this.add(this.card1);
+        this.add(this.card2);
+        
+        // Calculate the y of the card so that a non-rotated card would be exactly at
+        // the bottom of the user sprite
+        let y = this.active_user_sprite.displayHeight * 0.5 - this.card1.card.displayHeight * 0.5
+        this.card1.setPosition(this.card1.card.width * this.card1.card.scale * 0.35, y);
+        this.card2.setPosition(-this.card1.card.width * this.card1.card.scale * 0.35, y);
+
+        this.card1.setAngle(3);
+        this.card2.setAngle(-3);
+
+        this.bringToTop(this.card2);
+        this.bringToTop(this.card1);
     }
 
     deleteCards() {

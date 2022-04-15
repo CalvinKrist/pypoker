@@ -569,9 +569,6 @@ export class PokerRoom extends Room<GameState> {
 Feature list:
 - if someone is all-in, don't give them any more turns
 - if someone is all-in, and more players bet, make a new pot for that
-- verify that people aren't raising more chips than they have
 - create some visual indicator as to what action a player took
 - better show when it's the current player's turn
-- if every calls in the river, show cards
-- when we are all-in, show player cards
 */
