@@ -530,6 +530,8 @@ var _cardBackPng = require("./assets/card_back.png");
 var _cardBackPngDefault = parcelHelpers.interopDefault(_cardBackPng);
 var _pokerChipPng = require("./assets/poker_chip.png");
 var _pokerChipPngDefault = parcelHelpers.interopDefault(_pokerChipPng);
+var _roundRectPng = require("./assets/round_rect.png");
+var _roundRectPngDefault = parcelHelpers.interopDefault(_roundRectPng);
 var _readystate = require("../messages/readystate");
 var _pubsubJs = require("pubsub-js");
 var _pubsubJsDefault = parcelHelpers.interopDefault(_pubsubJs);
@@ -596,6 +598,86 @@ class DealerChit extends _phaserMinJsDefault.default.GameObjects.Container {
         this.add(this.dealer_chit_label);
     }
 }
+class Button extends _phaserMinJsDefault.default.GameObjects.Container {
+    constructor(scene, x, y, text, callback){
+        super(scene, x, y);
+        scene.children.add(this);
+        this.bgColor = 0;
+        this.bgMouseOverColor = 0;
+        this.fontColor = "#fff";
+        this.fontMouseOverColor = "#f39c12";
+        let tmp = this;
+        this.button = scene.add.text(0, 0, text, {
+            fontFamily: 'Quicksand',
+            fontSize: '32px',
+            color: tmp.fontColor,
+            align: 'center'
+        }).setOrigin(0.5).setInteractive({
+            useHandCursor: true
+        }).on('pointerover', ()=>{
+            tmp.button.setStyle({
+                fill: tmp.fontMouseOverColor
+            });
+            tmp.bg.tint = tmp.bgMouseOverColor;
+        }).on('pointerout', ()=>{
+            tmp.button.setStyle({
+                fill: tmp.fontColor
+            });
+            tmp.bg.tint = tmp.bgColor;
+        }).on('pointerdown', callback);
+        this.bg = scene.add.image(0, 0, "round_rect");
+        this.bg.tint = this.bgColor;
+        this.add(this.button);
+        this.add(this.bg);
+        this.bringToTop(this.button);
+        this.resize();
+    }
+    setBgColor(color) {
+        this.bg.tint = color;
+        this.bgColor = color;
+    }
+    setBgMouseOverColor(color) {
+        this.bgMouseOverColor = color;
+    }
+    setFontColor(color) {
+        this.button.setStyle({
+            fill: color
+        });
+        this.fontColor = color;
+    }
+    setFontMouseOverColor(color) {
+        this.fontMouseOverColor = color;
+    }
+    set(property, value) {
+        this.button[property] = value;
+        this.bg[property] = value;
+    }
+    setText(text) {
+        this.button.setText(text);
+        this.resize();
+    }
+    resize() {
+        let y_pad = 12;
+        let x_pad = 12;
+        let rw = this.button.displayWidth + x_pad * 2; // double padding for top and bottom
+        if (rw < 110) {
+            x_pad = (110 - this.button.displayWidth) / 2;
+            rw = this.button.displayWidth + x_pad * 2;
+        }
+        let rh = this.button.displayHeight + y_pad * 2;
+        this.bg.displayWidth = rw;
+        this.bg.displayHeight = rh;
+        // increase it by 1.3x so the button hitbox is slightly bigger than the visual hitbox
+        this.button.setPadding(x_pad * 1.3, y_pad * 1.3);
+        this.width = this.button.width;
+        this.height = this.button.height;
+        this.displayWidth = this.button.displayWidth;
+        this.displayHeight = this.button.displayHeight;
+    }
+    on(label, functor) {
+        this.button.on(label, functor);
+    }
+}
 class CardBase extends _phaserMinJsDefault.default.GameObjects.Container {
     constructor(scene, card, shadow){
         super(scene, 0, 0);
@@ -616,17 +698,7 @@ class CardBase extends _phaserMinJsDefault.default.GameObjects.Container {
         this.add(this.shadow);
         this.bringToTop(this.card);
     }
-    setDisplayHeight(height) {
-        this.shadow.displayHeight = height;
-        this.card.displayHeight = height;
-    }
-    setHeight(height) {
-        this.shadow.height = height;
-        this.card.height = height;
-    }
     setScale(s) {
-        console.log("old scale: " + this.shadow.scale);
-        console.log("new scale: " + s);
         this.shadow.scale = s;
         this.card.scale = s;
     }
@@ -705,40 +777,63 @@ class UserSprite extends _phaserMinJsDefault.default.GameObjects.Container {
     }
     dealCards(scene) {}
     foldCards(scene) {
-        this.makeMessage(scene, "Folded");
+        this.makeMessage(scene, "Fold", 15419994);
+        for (let card of [
+            this.card1.card,
+            this.card1.shadow,
+            this.card2.card,
+            this.card2.shadow
+        ]){
+            let endY = card.y + card.displayHeight;
+            let playerObj = this;
+            var tween = scene.tweens.add({
+                targets: card,
+                y: endY,
+                alpha: 0.2,
+                ease: 'linear',
+                delay: 50,
+                duration: 400,
+                onComplete: function() {
+                    playerObj.deleteCards();
+                }
+            });
+        }
     }
     call(scene) {
-        this.makeMessage(scene, "Called");
+        this.makeMessage(scene, "Call", 15121498);
     }
     raise(scene) {
-        this.makeMessage(scene, "Raised");
+        this.makeMessage(scene, "Raise", 3969731);
     }
-    makeMessage(scene, message) {
-        let callMsg = scene.add.text(0, 0, message, {
+    makeMessage(scene, message, color) {
+        let callMsg = scene.add.text(this.x, this.y, message, {
             fontFamily: 'Quicksand',
-            fontSize: '32px',
+            fontSize: '36px',
             color: '#fff',
             align: 'center'
-        }).setOrigin(0.5).setPadding(10).setStyle({
-            backgroundColor: "#111"
-        }).setVisible(true).on('pointerover', ()=>button.setStyle({
-                fill: "#f39c12"
-            })
-        ).on('pointerout', ()=>button.setStyle({
-                fill: "#FFF"
-            })
-        );
-        this.add(callMsg);
+        }).setOrigin(0.5).setVisible(true);
+        let padding = 12;
+        let rw = callMsg.displayWidth + padding * 2;
+        let rh = callMsg.displayHeight + padding;
+        let bg = scene.add.image(this.x, this.y, "round_rect");
+        bg.displayWidth = rw;
+        bg.displayHeight = rh;
+        bg.tint = color;
         var tween = scene.tweens.add({
-            targets: callMsg,
+            targets: [
+                callMsg,
+                bg
+            ],
             alpha: 0,
             ease: 'linear',
-            delay: 1000,
-            duration: 500,
+            delay: 1200,
+            duration: 560,
             onComplete: function() {
                 callMsg.destroy();
+                bg.destroy();
             }
         });
+        scene.children.bringToTop(callMsg);
     }
     updatePlayer(scene, player) {
         let name_str = player.id;
@@ -758,11 +853,10 @@ class UserSprite extends _phaserMinJsDefault.default.GameObjects.Container {
         this.num_chips_label.setText(bb + " bb");
         let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
         if (player.hand.length > 0 && this.oldPlayerState.hand.length == 0) this.dealCards(scene);
+        // TODO: if in a round, a player does call -> fold -> call and the game moves to the next state, this logic doesn't work because the same player goes twice in a row
         if (!player.isTurn && this.oldPlayerState.isTurn) {
-            if (player.lastAction === _playeraction.FOLD) {
-                this.foldCards(scene);
-                this.deleteCards();
-            } else if (player.lastAction === _playeraction.CALL) this.call(scene);
+            if (player.lastAction === _playeraction.FOLD) this.foldCards(scene);
+            else if (player.lastAction === _playeraction.CALL) this.call(scene);
             else if (player.lastAction === _playeraction.RAISE) this.raise(scene);
         }
         if (hand.length > 1 && player.inRound && JSON.stringify(player.hand) !== JSON.stringify(this.oldPlayerState.hand) || player.shouldShowHand != this.oldPlayerState.shouldShowHand) {
@@ -828,19 +922,30 @@ class UserSprite extends _phaserMinJsDefault.default.GameObjects.Container {
         }
         // Scale the card to 80% of the user sprite height
         let scaleFactor = this.active_user_sprite.displayHeight / this.card1.card.displayHeight;
-        this.card1.setScale(scaleFactor * this.card1.card.scale * 0.7);
-        this.card2.setScale(scaleFactor * this.card2.card.scale * 0.7);
+        this.card1.setScale(scaleFactor * this.card1.card.scale * 0.75);
+        this.card2.setScale(scaleFactor * this.card2.card.scale * 0.75);
         this.add(this.card1);
         this.add(this.card2);
         // Calculate the y of the card so that a non-rotated card would be exactly at
         // the bottom of the user sprite
-        let y = this.active_user_sprite.displayHeight * 0.5 - this.card1.card.displayHeight * 0.5;
+        let y = this.active_user_sprite.displayHeight * 0.5 - this.card1.card.displayHeight * 0.4;
         this.card1.setPosition(this.card1.card.width * this.card1.card.scale * 0.35, y);
         this.card2.setPosition(-this.card1.card.width * this.card1.card.scale * 0.35, y);
         this.card1.setAngle(3);
         this.card2.setAngle(-3);
         this.bringToTop(this.card2);
         this.bringToTop(this.card1);
+        // Add card mask
+        for (let card of [
+            this.card1,
+            this.card2
+        ]){
+            let cardMask = scene.add.rectangle(this.x - this.active_user_sprite.displayWidth, this.y + this.active_user_sprite.displayHeight / 2, this.active_user_sprite.displayWidth * 2, 100, 0).setOrigin(0).setVisible(false);
+            let mask = new _phaserMinJsDefault.default.Display.Masks.BitmapMask(scene, cardMask);
+            card.card.mask = mask;
+            card.shadow.mask = mask;
+            mask.invertAlpha = true;
+        }
     }
     deleteCards() {
         // TODO: this deletion code crashes things when the screen is resized
@@ -868,6 +973,7 @@ the 'implements Player' syntax doesn't work
         this.load.image("active_user_icon", _activeUserIconPngDefault.default);
         this.load.image("card_back", _cardBackPngDefault.default);
         this.load.image("poker_chip", _pokerChipPngDefault.default);
+        this.load.image("round_rect", _roundRectPngDefault.default);
         this.load.plugin('rexinputtextplugin', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexinputtextplugin.min.js', true);
     }
     create() {
@@ -900,19 +1006,29 @@ the 'implements Player' syntax doesn't work
         this.dealerChit.setVisible(false);
         let player_sprites = [];
         for(let i1 = 0; i1 < 6; i1++)player_sprites.push(new UserSprite(this, -1000, -1000, this.dealerChit));
-        this.fold = this.drawButton("Fold", this.cameras.main.width * 0.7, this.cameras.main.height * 0.9, ()=>{
-            this.room.send("fold", {});
-        });
-        this.call = this.drawButton("Call", this.fold.x + this.fold.width * 0.5 + 10, this.cameras.main.height * 0.9, ()=>{
+        this.raise_btn = this.drawButton("Raise To", this.cameras.main.width, this.cameras.main.height * 0.9, ()=>{});
+        this.raise_btn.x -= this.raise_btn.width * 0.5 + 30;
+        this.call = this.drawButton("Call", this.raise_btn.x - this.raise_btn.width * 0.5 - 5, this.cameras.main.height * 0.9, ()=>{
             this.room.send("call", {});
         });
-        this.call.x += this.call.width * 0.5;
-        this.raise_btn = this.drawButton("Raise To", this.call.x + this.call.width * 0.5 + 10, this.cameras.main.height * 0.9, ()=>{});
-        this.raise_btn.x += this.raise_btn.width * 0.5;
+        this.call.x -= this.call.width * 0.5;
+        this.fold = this.drawButton("Fold", this.call.x - this.call.width * 0.5 - 5, this.cameras.main.height * 0.9, ()=>{
+            this.room.send("fold", {});
+        });
+        this.fold.x -= this.fold.width * 0.5;
         this.fold.setVisible(false);
         this.call.setVisible(false);
         this.raise_btn.setVisible(false);
-        this.bet_submit_btn = this.drawButton("Send", this.raise_btn.x + this.raise_btn.width * 0.3, this.raise_btn.y - this.raise_btn.displayHeight * 1.2, ()=>{});
+        this.fold.setBgColor(13935950);
+        this.call.setBgColor(13935950);
+        this.raise_btn.setBgColor(13935950);
+        this.fold.setBgMouseOverColor(12420154);
+        this.call.setBgMouseOverColor(12420154);
+        this.raise_btn.setBgMouseOverColor(12420154);
+        this.fold.setFontMouseOverColor("#fff");
+        this.call.setFontMouseOverColor("#fff");
+        this.raise_btn.setFontMouseOverColor("#fff");
+        this.bet_submit_btn = this.drawSquareButton("Send", this.raise_btn.x + this.raise_btn.displayWidth * 0.3, this.raise_btn.y - this.raise_btn.displayHeight * 1.2, ()=>{});
         this.bet_submit_btn.setStyle({
             fontFamily: 'Quicksand',
             fontSize: '18px',
@@ -981,7 +1097,7 @@ the 'implements Player' syntax doesn't work
                 this.bet_submit_btn.setVisible(false);
             }
         });
-        // TODO: when the window is resized mid-game, this becomes visible under the river
+        // TODO: when the window is resized mid-game, this becomes visible
         this.startbutton = this.drawButton("BEGIN", screenCenterX, screenCenterY, ()=>{
             this.room.send("ready", _readystate.READY);
             this.waiting_message.visible = true;
@@ -1002,7 +1118,7 @@ the 'implements Player' syntax doesn't work
         _pubsubJsDefault.default.subscribe('num-winners', (_, __)=>{
             if (this.state.winners["$items"].length > 0) {
                 this.startbutton.setVisible(true);
-                this.startbutton.setText("NEXT HAND");
+                this.startbutton.setText("Next Hand");
                 this.startbutton.y = screenCenterY * 1.3;
                 this.children.bringToTop(this.startbutton);
             }
@@ -1036,7 +1152,7 @@ the 'implements Player' syntax doesn't work
         // Draw the winner
         this.winner_text = this.add.text(screenCenterX, screenCenterY * 0.7, '', {
             fontFamily: 'Quicksand',
-            fontSize: '64px',
+            fontSize: '48px',
             color: '#fff',
             align: 'center',
             stroke: "#000",
@@ -1062,6 +1178,10 @@ the 'implements Player' syntax doesn't work
         _pubsubJsDefault.default.publishSync('num-winners', {});
     }
     drawButton(text, x, y, callback) {
+        let button = new Button(this, x, y, text, callback);
+        return button;
+    }
+    drawSquareButton(text, x, y, callback) {
         let button = this.add.text(x, y, text, {
             fontFamily: 'Quicksand',
             fontSize: '32px',
@@ -1261,7 +1381,7 @@ the 'implements Player' syntax doesn't work
     }
 }
 
-},{"./assets/cards.png":"9H5j7","./assets/user_icon.png":"TQFdN","./assets/active_user_icon.png":"012wM","./assets/card_back.png":"69fkW","./assets/poker_chip.png":"1FOdH","../messages/readystate":"azZen","pubsub-js":"7Q0x0","./phaser.min.js":"boWxm","../state/GameState":"5hkYg","../messages/playeraction":"lgSKO","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"9H5j7":[function(require,module,exports) {
+},{"./assets/cards.png":"9H5j7","./assets/user_icon.png":"TQFdN","./assets/active_user_icon.png":"012wM","./assets/card_back.png":"69fkW","./assets/poker_chip.png":"1FOdH","../messages/readystate":"azZen","pubsub-js":"7Q0x0","./phaser.min.js":"boWxm","../state/GameState":"5hkYg","../messages/playeraction":"lgSKO","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./assets/round_rect.png":"dmYsQ"}],"9H5j7":[function(require,module,exports) {
 module.exports = require('./helpers/bundle-url').getBundleURL('745A8') + "cards.19e466de.png" + "?" + Date.now();
 
 },{"./helpers/bundle-url":"lgJ39"}],"lgJ39":[function(require,module,exports) {
@@ -38226,6 +38346,9 @@ const CALL = "call";
 const RAISE = "raise";
 const ALL_IN = "all-in";
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["jjamN","6aAXe"], "6aAXe", "parcelRequire1d12")
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"dmYsQ":[function(require,module,exports) {
+module.exports = require('./helpers/bundle-url').getBundleURL('745A8') + "round_rect.dcb5c51a.png" + "?" + Date.now();
+
+},{"./helpers/bundle-url":"lgJ39"}]},["jjamN","6aAXe"], "6aAXe", "parcelRequire1d12")
 
 //# sourceMappingURL=devIndex.869a5add.js.map
