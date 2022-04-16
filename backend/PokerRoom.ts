@@ -79,9 +79,14 @@ export class PokerRoom extends Room<GameState> {
         return active_players[(active_players.indexOf(player) + 1) % active_players.length]
     }
 
-    private getCurrentPlayer() {
+    private getCurrentPlayer(): Player | { id: string; } {
         let id = Array.from(this.state.player_order).filter(id => this.state.player_map.get(id).isTurn)[0];
-        return this.state.player_map.get(id);
+        if(this.state.player_map.has(id)) {
+            return this.state.player_map.get(id);
+        }
+        return {
+            id:  null
+        }
     }
 
     private numPlayersInRound() {
@@ -302,11 +307,12 @@ export class PokerRoom extends Room<GameState> {
             this.state.pot = 0;
             this.state.running = false;
 
-            this.state.player_map.forEach((player) => {
-                if(this.gameState == Gamestate.River && this.numPlayersInRound() > 1) {
+            if(this.gameState == Gamestate.River && this.numPlayersInRound() > 1) {
+                for(let player of this.getPlayersInRound()) {
                     player.shouldShowHand = true;
                 }
-
+            }
+            this.state.player_map.forEach((player) => {
                 player.isTurn = false;
                 player.isReady = false;
             })
@@ -440,7 +446,7 @@ export class PokerRoom extends Room<GameState> {
         });
 
         this.onMessage("fold", (client, message) => {
-            if(this.getCurrentPlayer().id == client.id) {
+            if(this.getCurrentPlayer().id == client.id) { // TODO: this can crash...
                 this.fold(client.id);
                 this.flush();
             } else {
@@ -473,7 +479,7 @@ export class PokerRoom extends Room<GameState> {
             //console.log("onMessage::call")
         });
         this.onMessage("raise", (client, message: Raise) => {
-            if(this.getCurrentPlayer().id == client.id) {
+            if(this.getCurrentPlayer().id == client.id) { // TODO: this can crash too?
                 // Player must raise at least twice the last raise
                 let requiredMessage = 1 + this.lastRaise * 2;
                 let player = this.state.player_map.get(client.id);
@@ -569,6 +575,7 @@ export class PokerRoom extends Room<GameState> {
 Feature list:
 - if someone is all-in, don't give them any more turns
 - if someone is all-in, and more players bet, make a new pot for that
-- create some visual indicator as to what action a player took
-- better show when it's the current player's turn
+- ensure someone can't bb / sb if it takes them to negative chips
+- validate the raise inputs to ensure they are numbers
+- add spectators when ppl run out of chips or the table is full
 */

@@ -24,6 +24,9 @@ export class GameState extends Schema {
     @type("string")
     winningMessage: string;
 
+    @type("number")
+    numSpectators: number;
+
     constructor() {
         super();
         this.player_map = new MapSchema<Player>();
@@ -33,6 +36,7 @@ export class GameState extends Schema {
         this.board = new ArraySchema<Card>();
         this.winners = new ArraySchema<Player>();
         this.winningMessage = null;
+        this.numSpectators = 0;
     }
 
 }

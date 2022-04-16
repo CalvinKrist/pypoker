@@ -287,23 +287,26 @@ describe("testing PokerRoom", () => {
   });
 
   it("when players call it all the way, then the players must show their hands", async () => {
-    let num_clients = 2;
+    let num_clients = 3;
 
     let game = await createRoomWithClients(colyseus, num_clients);
     await game.ready();
     let room = game.room;
     let clients = game.clients;
 
-    for (let i = 0; i < 4; i++) {
-      for (let client of clients) {
-        client.send("call", {});
-        let [c, message] = await room.waitForMessage("call");
-      }
+    await game.action(0, "call", {})
+    await game.action(1, "call", {})
+    await game.action(2, "fold", {})
+
+    for (let i = 0; i < 3; i++) {
+      await game.action(1, "call", {})
+      await game.action(0, "call", {})
     }
 
-    for (let player of room.state.player_map.values()) {
-      expect(player.shouldShowHand).toBeTruthy();
-    }
+    
+    expect(game.getPlayer(0).shouldShowHand).toBeTruthy();
+    expect(game.getPlayer(1).shouldShowHand).toBeTruthy();
+    expect(game.getPlayer(2).shouldShowHand).toBeFalsy();
   });
 
   it("when players fold, then the players don't need to their hands", async () => {
@@ -346,5 +349,89 @@ describe("testing PokerRoom", () => {
     expect(game.getPlayer(1).bb).toEqual(startingBB - 1);
     expect(game.getPlayer(1).currentBet).toEqual(1);
     expect(room.state.pot).toEqual(1.5);
+  });
+
+  it("when the player who will be sb/bb/other are  >=1.5/2/1 bb when the round ends, they remain in the game", async () => {
+    let num_clients = 3;
+
+    let game = await createRoomWithClients(colyseus, num_clients);
+    await game.ready();
+    let room = game.room;
+    let clients = game.clients;
+
+    game.getPlayer(0).bb = 1.5; // is button: will become sb
+    game.getPlayer(1).bb = 2.0; // is sb: will become bb
+    game.getPlayer(2).bb = 1.0; // is bb: will become button
+    room.state.pot = 0;
+
+    await game.action(0, "call", {})
+    await game.action(1, "call", {})
+    await game.action(2, "call", {})
+    for (let i = 0; i < 4; i++) {
+      await game.action(1, "call", {})
+      await game.action(2, "call", {})
+      await game.action(0, "call", {})
+    }
+
+    expect(room.gameState).toEqual(Gamestate.EndGame);
+    
+    expect(room.state.player_map.has(game.getPlayer(0).id)).toBeTruthy();
+    expect(room.state.player_map.has(game.getPlayer(1).id)).toBeTruthy();
+    expect(room.state.player_map.has(game.getPlayer(2).id)).toBeTruthy();
+  });
+
+  it("when the player would be kicked but wins a pot, they stay in the game", async () => {
+    let num_clients = 3;
+
+    let game = await createRoomWithClients(colyseus, num_clients);
+    await game.ready();
+    let room = game.room;
+    let clients = game.clients;
+
+    game.getPlayer(0).bb = 1; // is button: will become sb
+    game.getPlayer(1).bb = 2.0; // is sb: will become bb
+    game.getPlayer(2).bb = 0; // is bb: will become button
+    room.state.pot = 10;
+
+    await game.action(0, "call", {})
+    await game.action(1, "call", {})
+    await game.action(2, "call", {})
+    for (let i = 0; i < 4; i++) {
+      await game.action(1, "call", {})
+      await game.action(2, "call", {})
+      await game.action(0, "call", {})
+    }
+
+    expect(1).toEqual(2);
+  });
+
+  it("when the player who will be sb/bb/other are < 1.5/2/1 bb when the round ends, they are kicked from the game", async () => {
+    let num_clients = 3;
+
+    let game = await createRoomWithClients(colyseus, num_clients);
+    await game.ready();
+    let room = game.room;
+    let clients = game.clients;
+
+    game.getPlayer(0).bb = 1.4; // is button: will become sb
+    game.getPlayer(1).bb = 1.9; // is sb: will become bb
+    game.getPlayer(2).bb = 0.9; // is bb: will become button
+    room.state.pot = 0;
+
+    await game.action(0, "call", {})
+    await game.action(1, "call", {})
+    await game.action(2, "call", {})
+    for (let i = 0; i < 4; i++) {
+      await game.action(1, "call", {})
+      await game.action(2, "call", {})
+      await game.action(0, "call", {})
+    }
+
+    expect(room.gameState).toEqual(Gamestate.EndGame);
+    
+    expect(room.state.player_map.has(game.getPlayer(0).id)).toBeFalsy();
+    expect(room.state.player_map.has(game.getPlayer(1).id)).toBeFalsy();
+    expect(room.state.player_map.has(game.getPlayer(2).id)).toBeFalsy();
+    expect(room.state.numSpectators).toEqual(3);
   });
 });
