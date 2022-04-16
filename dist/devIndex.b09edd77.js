@@ -530,10 +530,14 @@ async function joinRoom(playerPromise) {
     };
     room.onMessage("state-update", (newState)=>{
         console.log(newState);
+        console.log(JSON.stringify(newState));
         player.updateState(newState);
     });
     room.onMessage("error", (errorMessage)=>{
         player.onServerError(errorMessage);
+    });
+    room.onLeave((code)=>{
+        console.log("client left the room");
     });
 }
 function startRandomBot() {

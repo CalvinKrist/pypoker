@@ -215,7 +215,7 @@ class PlayGame extends Phaser.Scene {
             const players = this.state.player_map;
             // Rotate the player state so the player is in the center bottom
             let player_keys = Array.from(player_ids.values())
-            if (player_keys.length > 0) {
+            if (player_keys.length > 0 && player_keys.indexOf(this.userId) != -1) {
                 while (players.get(player_keys[0]).id != this.userId) {
                     arrayRotate(player_keys);
                 }
@@ -243,7 +243,7 @@ class PlayGame extends Phaser.Scene {
             }
 
             // Create player actions
-            if (this.state.winners["$items"].length == 0 && this.state.running && players.get(this.userId).isTurn) {
+            if (this.state.winners["$items"].length == 0 && player_keys.indexOf(this.userId) != -1 && this.state.running && players.get(this.userId).isTurn) {
                 this.fold.setVisible(true);
                 this.call.setVisible(true);
                 this.raise_btn.setVisible(true);
@@ -261,7 +261,7 @@ class PlayGame extends Phaser.Scene {
         this.startbutton = this.drawButton("BEGIN", screenCenterX, screenCenterY, () => {
             this.room.send("ready", READY);
             this.waiting_message.visible = true;
-            this.startbutton.visible = false;
+            this.startbutton.setVisible(false);
         });
         this.waiting_message = this.add.text(screenCenterX, screenCenterY, 'WAITING', {
             fontFamily: 'Quicksand',
@@ -278,9 +278,17 @@ class PlayGame extends Phaser.Scene {
                 }
             }
         });
+        PubSub.subscribe('state-change', (_, __) => {
+            if(!this.state.running && this.userId && this.state.player_order.indexOf(this.userId) == -1) {
+                console.log("setting invisible")
+                console.log(this.userId);
+                console.log(this.state.player_order);
+                this.startbutton.setVisible(false);
+            }
+        });
 
         PubSub.subscribe('num-winners', (_, __) => {
-            if (this.state.winners["$items"].length > 0) {
+            if (this.state.winners["$items"].length > 0 && this.state.player_order.indexOf(this.userId) != -1) {
                 this.startbutton.setVisible(true);
                 this.startbutton.setText("Next Hand");
                 this.startbutton.y = screenCenterY * 1.3;

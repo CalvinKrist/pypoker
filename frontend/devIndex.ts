@@ -22,11 +22,16 @@ async function joinRoom(playerPromise: Promise<Player>) {
 
     room.onMessage("state-update", (newState: any) => {
         console.log(newState);
+        console.log(JSON.stringify(newState));
         player.updateState(newState);
     });
 
     room.onMessage("error", (errorMessage: ErrorMessage) => {
         player.onServerError(errorMessage);
+    });
+
+    room.onLeave((code) => {
+        console.log("client left the room");
     });
 }
 

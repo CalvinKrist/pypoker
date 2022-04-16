@@ -24,6 +24,7 @@ async function joinRoom(playerPromise: Promise<Player>) {
 
     room.onMessage("state-update", (newState: any) => {
         console.log(newState);
+        console.log(JSON.stringify(newState));
         player.updateState(newState);
     });
 
@@ -68,4 +69,3 @@ declare global {
 console.log("in my index!!!")
 window.startGame = startGame;
 window.startRandomBot = startRandomBot;
-

@@ -413,14 +413,14 @@ describe("testing PokerRoom", () => {
     let room = game.room;
     let clients = game.clients;
 
-    game.getPlayer(0).bb = 1.4; // is button: will become sb
-    game.getPlayer(1).bb = 1.9; // is sb: will become bb
-    game.getPlayer(2).bb = 0.9; // is bb: will become button
-    room.state.pot = 0;
+    game.getPlayer(0).bb = 1.9; // is button: will become bb
+    game.getPlayer(1).bb = 0.9; // is sb: will become button
+    game.getPlayer(2).bb = 1.4; // is bb: will become sb
 
     await game.action(0, "call", {})
     await game.action(1, "call", {})
     await game.action(2, "call", {})
+    room.state.pot = 0;
     for (let i = 0; i < 4; i++) {
       await game.action(1, "call", {})
       await game.action(2, "call", {})
@@ -429,9 +429,9 @@ describe("testing PokerRoom", () => {
 
     expect(room.gameState).toEqual(Gamestate.EndGame);
     
-    expect(room.state.player_map.has(game.getPlayer(0).id)).toBeFalsy();
-    expect(room.state.player_map.has(game.getPlayer(1).id)).toBeFalsy();
-    expect(room.state.player_map.has(game.getPlayer(2).id)).toBeFalsy();
+    expect(game.getPlayer(0)).toBeFalsy();
+    expect(game.getPlayer(1)).toBeFalsy();
+    expect(game.getPlayer(2)).toBeFalsy();
     expect(room.state.numSpectators).toEqual(3);
   });
 });

@@ -41,6 +41,7 @@ export class PokerRoom extends Room<GameState> {
     currentPlay: string;
     deck: Deck;
     toDelete: string[];
+    spectators: Player[]
 
     constructor() {
         super();
@@ -51,6 +52,8 @@ export class PokerRoom extends Room<GameState> {
         this.currentPlay = ""; // tracks which player the play comes off of, ie the last player to bet
         this.toDelete = [];
         this.deck = new Deck();
+        
+        this.spectators = [];
     }
 
     private allPlayersReady(): boolean {
@@ -318,6 +321,40 @@ export class PokerRoom extends Room<GameState> {
             })
 
             this.gameState = nextState;
+
+            // Determine players who need to be kicked: sb/bb/other are < 1.5/2/1
+            let dealer = Array.from(this.state.player_map.values()).filter(player => player.isDealer)[0];
+            let next_dealer_index = (this.state.player_order.indexOf(dealer.id) + 1) % this.state.player_order.length;
+
+            let sb_id = this.state.player_order[(next_dealer_index + 1) % this.state.player_order.length];
+            let bb_id = this.state.player_order[(next_dealer_index + 2) % this.state.player_order.length];
+            if (this.state.player_order.length == 2) {
+                sb_id = dealer.id
+                sb_id = this.state.player_map.get(this.state.player_order[(next_dealer_index + 1) % 2 ]).id;
+            } 
+                
+            let player_ids = this.state.player_order.map(x => x);
+
+            for(let id of player_ids) {
+                let player = this.state.player_map.get(id);
+                if(id == sb_id && player.bb  < 1.5) {
+                    this.spectators.push(player);
+                    this.state.player_map.delete(id);
+                    this.state.player_order.splice(this.state.player_order.indexOf(id), 1);
+                    this.state.numSpectators += 1;
+                } else if(id == bb_id && player.bb  < 2) {
+                    this.spectators.push(player);
+                    this.state.player_map.delete(id);
+                    this.state.player_order.splice(this.state.player_order.indexOf(id), 1);
+                    this.state.numSpectators += 1;
+                }
+                else if(player.bb  < 1) {
+                    this.spectators.push(player);
+                    this.state.player_map.delete(id);
+                    this.state.player_order.splice(this.state.player_order.indexOf(id), 1);
+                    this.state.numSpectators += 1;
+                }
+            }
         } else if (this.gameState == Gamestate.EndGame && nextState == Gamestate.Preflop) {
             this.gameState = Gamestate.Preround;
             this.reset();
@@ -437,7 +474,7 @@ export class PokerRoom extends Room<GameState> {
                 this.state.player_map.get(client.id).isReady = message.isReady;
             }
 
-            if (this.allPlayersReady() && this.clients.length > 1) {
+            if (this.allPlayersReady() && this.state.player_order.length > 1) {
                 this.transitionState(Gamestate.Preflop);
             }
 
