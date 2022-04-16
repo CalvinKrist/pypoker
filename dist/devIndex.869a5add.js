@@ -532,11 +532,14 @@ var _pokerChipPng = require("./assets/poker_chip.png");
 var _pokerChipPngDefault = parcelHelpers.interopDefault(_pokerChipPng);
 var _roundRectPng = require("./assets/round_rect.png");
 var _roundRectPngDefault = parcelHelpers.interopDefault(_roundRectPng);
+var _button = require("./Button");
+var _userSprite = require("./UserSprite");
 var _readystate = require("../messages/readystate");
 var _pubsubJs = require("pubsub-js");
 var _pubsubJsDefault = parcelHelpers.interopDefault(_pubsubJs);
 var _phaserMinJs = require("./phaser.min.js");
 var _phaserMinJsDefault = parcelHelpers.interopDefault(_phaserMinJs);
+var _gameOptions = require("./GameOptions");
 var _gameState = require("../state/GameState");
 var _playeraction = require("../messages/playeraction");
 let game;
@@ -545,14 +548,6 @@ function arrayRotate(arr, reverse) {
     arr.push(arr.shift());
     return arr;
 }
-// global object with game options
-let gameOptions = {
-    // card width, in pixels
-    cardWidth: 334,
-    // card height, in pixels
-    cardHeight: 440,
-    cardScale: 0.2
-};
 function createGame() {
     document.body.style['overflow'] = 'hidden';
     let gameConfig = {
@@ -598,361 +593,6 @@ class DealerChit extends _phaserMinJsDefault.default.GameObjects.Container {
         this.add(this.dealer_chit_label);
     }
 }
-class Button extends _phaserMinJsDefault.default.GameObjects.Container {
-    constructor(scene, x, y, text, callback){
-        super(scene, x, y);
-        scene.children.add(this);
-        this.bgColor = 0;
-        this.bgMouseOverColor = 0;
-        this.fontColor = "#fff";
-        this.fontMouseOverColor = "#f39c12";
-        let tmp = this;
-        this.button = scene.add.text(0, 0, text, {
-            fontFamily: 'Quicksand',
-            fontSize: '32px',
-            color: tmp.fontColor,
-            align: 'center'
-        }).setOrigin(0.5).setInteractive({
-            useHandCursor: true
-        }).on('pointerover', ()=>{
-            tmp.button.setStyle({
-                fill: tmp.fontMouseOverColor
-            });
-            tmp.bg.tint = tmp.bgMouseOverColor;
-        }).on('pointerout', ()=>{
-            tmp.button.setStyle({
-                fill: tmp.fontColor
-            });
-            tmp.bg.tint = tmp.bgColor;
-        }).on('pointerdown', callback);
-        this.bg = scene.add.image(0, 0, "round_rect");
-        this.bg.tint = this.bgColor;
-        this.add(this.button);
-        this.add(this.bg);
-        this.bringToTop(this.button);
-        this.resize();
-    }
-    setBgColor(color) {
-        this.bg.tint = color;
-        this.bgColor = color;
-    }
-    setBgMouseOverColor(color) {
-        this.bgMouseOverColor = color;
-    }
-    setFontColor(color) {
-        this.button.setStyle({
-            fill: color
-        });
-        this.fontColor = color;
-    }
-    setFontMouseOverColor(color) {
-        this.fontMouseOverColor = color;
-    }
-    set(property, value) {
-        this.button[property] = value;
-        this.bg[property] = value;
-    }
-    setText(text) {
-        this.button.setText(text);
-        this.resize();
-    }
-    resize() {
-        let y_pad = 12;
-        let x_pad = 12;
-        let rw = this.button.displayWidth + x_pad * 2; // double padding for top and bottom
-        if (rw < 110) {
-            x_pad = (110 - this.button.displayWidth) / 2;
-            rw = this.button.displayWidth + x_pad * 2;
-        }
-        let rh = this.button.displayHeight + y_pad * 2;
-        this.bg.displayWidth = rw;
-        this.bg.displayHeight = rh;
-        // increase it by 1.3x so the button hitbox is slightly bigger than the visual hitbox
-        this.button.setPadding(x_pad * 1.3, y_pad * 1.3);
-        this.width = this.button.width;
-        this.height = this.button.height;
-        this.displayWidth = this.button.displayWidth;
-        this.displayHeight = this.button.displayHeight;
-    }
-    on(label, functor) {
-        this.button.on(label, functor);
-    }
-}
-class CardBase extends _phaserMinJsDefault.default.GameObjects.Container {
-    constructor(scene, card, shadow){
-        super(scene, 0, 0);
-        scene.children.add(this);
-        this.card = card;
-        this.shadow = shadow;
-        this.card.setOrigin(0.5);
-        this.shadow.setOrigin(0.5);
-        this.card.setPosition(0, 0);
-        this.shadow.setPosition(0, 0);
-        this.shadow.x = -3;
-        this.shadow.y = 2;
-        this.shadow.scale = this.card.scale;
-        this.shadow.tint = 0;
-        this.shadow.alpha = 0.6;
-        this.shadow.angle = this.card.angle;
-        this.add(this.card);
-        this.add(this.shadow);
-        this.bringToTop(this.card);
-    }
-    setScale(s) {
-        this.shadow.scale = s;
-        this.card.scale = s;
-    }
-}
-class CardSprite extends CardBase {
-    constructor(scene, suit, value){
-        super(scene, scene.createCard(suit, value), scene.createCard(suit, value));
-    }
-}
-class CardBackSprite extends CardBase {
-    constructor(scene){
-        super(scene, scene.add.sprite(0, 0, "card_back").setScale(gameOptions.cardScale * 0.64), scene.add.sprite(0, 0, "card_back").setScale(gameOptions.cardScale * 0.64));
-    }
-}
-const ABOVE = 0;
-const BELOW = 1;
-const NONE = 2;
-class UserSprite extends _phaserMinJsDefault.default.GameObjects.Container {
-    constructor(scene, x, y, dealerChit){
-        super(scene, x, y);
-        scene.children.add(this);
-        this.dealerChit = dealerChit;
-        let name_str = "";
-        let bb = 0;
-        let isDealer = false;
-        this.active_user_sprite = scene.add.sprite(0, 0, "active_user_icon");
-        this.inactive_user_sprite = scene.add.sprite(0, 0, "user_icon");
-        // Scale the user sprite to 17.5% of the camera's height
-        let scaleFactor = scene.cameras.main.height / this.active_user_sprite.displayHeight;
-        this.active_user_sprite.setScale(this.active_user_sprite.scale * scaleFactor * 0.175);
-        this.inactive_user_sprite.setScale(this.inactive_user_sprite.scale * scaleFactor * 0.175);
-        this.active_user_sprite.setVisible(false);
-        this.add(this.active_user_sprite);
-        this.add(this.inactive_user_sprite);
-        this.name = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 10, name_str, {
-            fontFamily: 'Quicksand',
-            fontSize: '16px',
-            color: '#000',
-            align: 'center'
-        }).setOrigin(0.5);
-        this.add(this.name);
-        this.num_chips_label = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 32, bb + " bb", {
-            fontFamily: 'Quicksand',
-            fontSize: '16px',
-            color: '#000',
-            align: 'center'
-        }).setOrigin(0.5);
-        this.add(this.num_chips_label);
-        this.card1 = null;
-        this.card2 = null;
-        if (isDealer) {
-            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth / 2, this.y);
-            this.dealerChit.setVisible(true);
-        }
-        this.screenCenterX = scene.cameras.main.worldView.x + scene.cameras.main.width / 2;
-        this.screenCenterY = scene.cameras.main.worldView.y + scene.cameras.main.height / 2;
-        this.chips = [];
-        let chit_x = this.active_user_sprite.displayWidth * 0.8;
-        for(let i = 0; i < 4; i++){
-            let chip_sprite = scene.add.sprite(chit_x + Math.floor(Math.random() * 10), Math.floor(Math.random() * 10), "poker_chip").setOrigin(0.5);
-            chip_sprite.displayHeight = 40;
-            chip_sprite.displayWidth = 40;
-            this.chips.push(chip_sprite);
-            chip_sprite.setVisible(false);
-            this.add(chip_sprite);
-        }
-        this.chip_label = scene.add.text(chit_x, 40, '0 BB', {
-            fontFamily: 'Quicksand',
-            fontSize: '24px',
-            color: '#000',
-            align: 'center'
-        }).setOrigin(0.5);
-        this.add(this.chip_label);
-        this.chip_label.setVisible(false);
-        this.orrientation = NONE;
-    }
-    dealCards(scene) {}
-    foldCards(scene) {
-        this.makeMessage(scene, "Fold", 15419994);
-        for (let card of [
-            this.card1.card,
-            this.card1.shadow,
-            this.card2.card,
-            this.card2.shadow
-        ]){
-            let endY = card.y + card.displayHeight;
-            let playerObj = this;
-            var tween = scene.tweens.add({
-                targets: card,
-                y: endY,
-                alpha: 0.2,
-                ease: 'linear',
-                delay: 50,
-                duration: 400,
-                onComplete: function() {
-                    playerObj.deleteCards();
-                }
-            });
-        }
-    }
-    call(scene) {
-        this.makeMessage(scene, "Call", 15121498);
-    }
-    raise(scene) {
-        this.makeMessage(scene, "Raise", 3969731);
-    }
-    makeMessage(scene, message, color) {
-        let callMsg = scene.add.text(this.x, this.y, message, {
-            fontFamily: 'Quicksand',
-            fontSize: '36px',
-            color: '#fff',
-            align: 'center'
-        }).setOrigin(0.5).setVisible(true);
-        let padding = 12;
-        let rw = callMsg.displayWidth + padding * 2;
-        let rh = callMsg.displayHeight + padding;
-        let bg = scene.add.image(this.x, this.y, "round_rect");
-        bg.displayWidth = rw;
-        bg.displayHeight = rh;
-        bg.tint = color;
-        var tween = scene.tweens.add({
-            targets: [
-                callMsg,
-                bg
-            ],
-            alpha: 0,
-            ease: 'linear',
-            delay: 1200,
-            duration: 560,
-            onComplete: function() {
-                callMsg.destroy();
-                bg.destroy();
-            }
-        });
-        scene.children.bringToTop(callMsg);
-    }
-    updatePlayer(scene, player) {
-        let name_str = player.id;
-        let bb = player.bb;
-        let hand = Array.from(player.hand.values());
-        let isDealer = player.isDealer;
-        let active = player.isTurn;
-        this.active_user_sprite.setVisible(active);
-        this.inactive_user_sprite.setVisible(!active);
-        if (scene.state.running && !player.inRound) this.inactive_user_sprite.alpha = 0.5;
-        else this.inactive_user_sprite.alpha = 1;
-        if (isDealer) {
-            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth * 0.75, this.y + 15);
-            this.dealerChit.setVisible(true);
-        }
-        this.name.text = name_str;
-        this.num_chips_label.setText(bb + " bb");
-        let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
-        if (player.hand.length > 0 && this.oldPlayerState.hand.length == 0) this.dealCards(scene);
-        // TODO: if in a round, a player does call -> fold -> call and the game moves to the next state, this logic doesn't work because the same player goes twice in a row
-        if (!player.isTurn && this.oldPlayerState.isTurn) {
-            if (player.lastAction === _playeraction.FOLD) this.foldCards(scene);
-            else if (player.lastAction === _playeraction.CALL) this.call(scene);
-            else if (player.lastAction === _playeraction.RAISE) this.raise(scene);
-        }
-        if (hand.length > 1 && player.inRound && JSON.stringify(player.hand) !== JSON.stringify(this.oldPlayerState.hand) || player.shouldShowHand != this.oldPlayerState.shouldShowHand) {
-            this.deleteCards();
-            this.drawCards(scene, player);
-        }
-        // Move the chips above or below the player
-        // if the orrientation has changed
-        if (newOrrientation != this.orrientation) {
-            let deltaY = 40;
-            if (newOrrientation == ABOVE) deltaY *= -1;
-            if (this.orrientation != NONE) deltaY *= 2;
-            this.orrientation = newOrrientation;
-            for(let i = 0; i < this.chips.length; i++)this.chips[i].y += deltaY;
-            this.chip_label.y += deltaY;
-        }
-        for(let i = 0; i < this.chips.length; i++)this.chips[i].setVisible(scene.state.running);
-        this.chip_label.setVisible(scene.state.running);
-        this.chip_label.text = player.currentBet + ' BB';
-        this.oldPlayerState = player;
-    }
-    setNewPlayer(scene, player) {
-        let name_str = player.id;
-        let bb = player.bb;
-        let hand = Array.from(player.hand.values());
-        let isDealer = player.isDealer;
-        let active = player.isTurn;
-        this.active_user_sprite.setVisible(active);
-        this.inactive_user_sprite.setVisible(!active);
-        if (scene.state.running && !player.inRound) this.inactive_user_sprite.alpha = 0.5;
-        else this.inactive_user_sprite.alpha = 1;
-        if (isDealer) {
-            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth * 0.75, this.y + 15);
-            this.dealerChit.setVisible(true);
-        }
-        this.name.text = name_str;
-        this.num_chips_label.setText(bb + " bb");
-        this.deleteCards();
-        let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
-        if (hand.length > 1 && player.inRound) this.drawCards(scene, player);
-        // Move the chips above or below the player
-        // if the orrientation has changed
-        if (newOrrientation != this.orrientation) {
-            let deltaY = 40;
-            if (newOrrientation == ABOVE) deltaY *= -1;
-            if (this.orrientation != NONE) deltaY *= 2;
-            this.orrientation = newOrrientation;
-            for(let i = 0; i < this.chips.length; i++)this.chips[i].y += deltaY;
-            this.chip_label.y += deltaY;
-        }
-        for(let i = 0; i < this.chips.length; i++)this.chips[i].setVisible(scene.state.running);
-        this.chip_label.setVisible(scene.state.running);
-        this.chip_label.text = player.currentBet + ' BB';
-        this.oldPlayerState = player;
-    }
-    drawCards(scene, player) {
-        if (player.id == scene.userId) {
-            this.card1 = new CardSprite(scene, player.hand[0].suit, player.hand[0].value);
-            this.card2 = new CardSprite(scene, player.hand[1].suit, player.hand[1].value);
-        } else {
-            this.card1 = new CardBackSprite(scene);
-            this.card2 = new CardBackSprite(scene);
-        }
-        // Scale the card to 80% of the user sprite height
-        let scaleFactor = this.active_user_sprite.displayHeight / this.card1.card.displayHeight;
-        this.card1.setScale(scaleFactor * this.card1.card.scale * 0.75);
-        this.card2.setScale(scaleFactor * this.card2.card.scale * 0.75);
-        this.add(this.card1);
-        this.add(this.card2);
-        // Calculate the y of the card so that a non-rotated card would be exactly at
-        // the bottom of the user sprite
-        let y = this.active_user_sprite.displayHeight * 0.5 - this.card1.card.displayHeight * 0.4;
-        this.card1.setPosition(this.card1.card.width * this.card1.card.scale * 0.35, y);
-        this.card2.setPosition(-this.card1.card.width * this.card1.card.scale * 0.35, y);
-        this.card1.setAngle(3);
-        this.card2.setAngle(-3);
-        this.bringToTop(this.card2);
-        this.bringToTop(this.card1);
-        // Add card mask
-        for (let card of [
-            this.card1,
-            this.card2
-        ]){
-            let cardMask = scene.add.rectangle(this.x - this.active_user_sprite.displayWidth, this.y + this.active_user_sprite.displayHeight / 2, this.active_user_sprite.displayWidth * 2, 100, 0).setOrigin(0).setVisible(false);
-            let mask = new _phaserMinJsDefault.default.Display.Masks.BitmapMask(scene, cardMask);
-            card.card.mask = mask;
-            card.shadow.mask = mask;
-            mask.invertAlpha = true;
-        }
-    }
-    deleteCards() {
-        // TODO: this deletion code crashes things when the screen is resized
-        if (this.card1 != null) this.card1.destroy();
-        if (this.card2 != null) this.card2.destroy();
-    }
-}
 /*
 This implementes Player, but because this is JS and not TS 
 the 'implements Player' syntax doesn't work
@@ -966,8 +606,8 @@ the 'implements Player' syntax doesn't work
     preload() {
         // loading the sprite sheet with all cards
         this.load.spritesheet("cards", _cardsPngDefault.default, {
-            frameWidth: gameOptions.cardWidth,
-            frameHeight: gameOptions.cardHeight
+            frameWidth: _gameOptions.gameOptions.cardWidth,
+            frameHeight: _gameOptions.gameOptions.cardHeight
         });
         this.load.image("user_icon", _userIconPngDefault.default);
         this.load.image("active_user_icon", _activeUserIconPngDefault.default);
@@ -1005,7 +645,7 @@ the 'implements Player' syntax doesn't work
         this.dealerChit = new DealerChit(this, 0, 0);
         this.dealerChit.setVisible(false);
         let player_sprites = [];
-        for(let i1 = 0; i1 < 6; i1++)player_sprites.push(new UserSprite(this, -1000, -1000, this.dealerChit));
+        for(let i1 = 0; i1 < 6; i1++)player_sprites.push(new _userSprite.UserSprite(this, -1000, -1000, this.dealerChit));
         this.raise_btn = this.drawButton("Raise To", this.cameras.main.width, this.cameras.main.height * 0.9, ()=>{});
         this.raise_btn.x -= this.raise_btn.width * 0.5 + 30;
         this.call = this.drawButton("Call", this.raise_btn.x - this.raise_btn.width * 0.5 - 5, this.cameras.main.height * 0.9, ()=>{
@@ -1133,7 +773,7 @@ the 'implements Player' syntax doesn't work
             let board = Array.from(this.state.board);
             let scale_up = 1.2;
             if (board.length > 0) {
-                let card_with = gameOptions.cardWidth * gameOptions.cardScale * scale_up + 15;
+                let card_with = _gameOptions.gameOptions.cardWidth * _gameOptions.gameOptions.cardScale * scale_up + 15;
                 let x_offset = screenCenterX - card_with * board.length / 2 + card_with / 2;
                 let i = 0;
                 for (let card of board){
@@ -1178,7 +818,7 @@ the 'implements Player' syntax doesn't work
         _pubsubJsDefault.default.publishSync('num-winners', {});
     }
     drawButton(text, x, y, callback) {
-        let button = new Button(this, x, y, text, callback);
+        let button = new _button.Button(this, x, y, text, callback);
         return button;
     }
     drawSquareButton(text, x, y, callback) {
@@ -1232,9 +872,9 @@ the 'implements Player' syntax doesn't work
         if (value == 14) value = 1;
         let i = suit * 13 + value - 1;
         // the card itself, a sprite created outside the stage, on the left
-        let card = this.add.sprite(-gameOptions.cardWidth * gameOptions.cardScale, game.config.height / 2, "cards", this.deck[i]);
+        let card = this.add.sprite(-_gameOptions.gameOptions.cardWidth * _gameOptions.gameOptions.cardScale, game.config.height / 2, "cards", this.deck[i]);
         // scale the sprite
-        card.setScale(gameOptions.cardScale);
+        card.setScale(_gameOptions.gameOptions.cardScale);
         // return the card
         return card;
     }
@@ -1381,7 +1021,7 @@ the 'implements Player' syntax doesn't work
     }
 }
 
-},{"./assets/cards.png":"9H5j7","./assets/user_icon.png":"TQFdN","./assets/active_user_icon.png":"012wM","./assets/card_back.png":"69fkW","./assets/poker_chip.png":"1FOdH","../messages/readystate":"azZen","pubsub-js":"7Q0x0","./phaser.min.js":"boWxm","../state/GameState":"5hkYg","../messages/playeraction":"lgSKO","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./assets/round_rect.png":"dmYsQ"}],"9H5j7":[function(require,module,exports) {
+},{"./assets/cards.png":"9H5j7","./assets/user_icon.png":"TQFdN","./assets/active_user_icon.png":"012wM","./assets/card_back.png":"69fkW","./assets/poker_chip.png":"1FOdH","../messages/readystate":"azZen","pubsub-js":"7Q0x0","./phaser.min.js":"boWxm","../state/GameState":"5hkYg","../messages/playeraction":"lgSKO","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./assets/round_rect.png":"dmYsQ","./Button":"ls0za","./UserSprite":"1immA","./GameOptions":"eXjCt"}],"9H5j7":[function(require,module,exports) {
 module.exports = require('./helpers/bundle-url').getBundleURL('745A8') + "cards.19e466de.png" + "?" + Date.now();
 
 },{"./helpers/bundle-url":"lgJ39"}],"lgJ39":[function(require,module,exports) {
@@ -33419,7 +33059,7 @@ var _helpers = require("@swc/helpers");
 var _schema = require("@colyseus/schema");
 var _player = require("./Player");
 var _card = require("./Card");
-var _class, _descriptor, _dec, _descriptor1, _dec1, _descriptor2, _dec2, _descriptor3, _dec3, _descriptor4, _dec4, _descriptor5, _dec5, _descriptor6, _dec6;
+var _class, _descriptor, _dec, _descriptor1, _dec1, _descriptor2, _dec2, _descriptor3, _dec3, _descriptor4, _dec4, _descriptor5, _dec5, _descriptor6, _dec6, _descriptor7, _dec7;
 let GameState = (_class = class GameState extends _schema.Schema {
     constructor(){
         super();
@@ -33430,6 +33070,7 @@ let GameState = (_class = class GameState extends _schema.Schema {
         _helpers.initializerDefineProperty(this, "pot", _descriptor4, this);
         _helpers.initializerDefineProperty(this, "winners", _descriptor5, this);
         _helpers.initializerDefineProperty(this, "winningMessage", _descriptor6, this);
+        _helpers.initializerDefineProperty(this, "numSpectators", _descriptor7, this);
         this.player_map = new _schema.MapSchema();
         this.running = false;
         this.player_order = new _schema.ArraySchema();
@@ -33437,6 +33078,7 @@ let GameState = (_class = class GameState extends _schema.Schema {
         this.board = new _schema.ArraySchema();
         this.winners = new _schema.ArraySchema();
         this.winningMessage = null;
+        this.numSpectators = 0;
     }
 }, _dec = _schema.type({
     map: _player.Player
@@ -33446,7 +33088,7 @@ let GameState = (_class = class GameState extends _schema.Schema {
     _card.Card
 ]), _dec3 = _schema.type("boolean"), _dec4 = _schema.type("number"), _dec5 = _schema.type([
     _player.Player
-]), _dec6 = _schema.type("string"), _descriptor = _helpers.applyDecoratedDescriptor(_class.prototype, "player_map", [
+]), _dec6 = _schema.type("string"), _dec7 = _schema.type("number"), _descriptor = _helpers.applyDecoratedDescriptor(_class.prototype, "player_map", [
     _dec
 ], {
     configurable: true,
@@ -33490,6 +33132,13 @@ let GameState = (_class = class GameState extends _schema.Schema {
     initializer: null
 }), _descriptor6 = _helpers.applyDecoratedDescriptor(_class.prototype, "winningMessage", [
     _dec6
+], {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    initializer: null
+}), _descriptor7 = _helpers.applyDecoratedDescriptor(_class.prototype, "numSpectators", [
+    _dec7
 ], {
     configurable: true,
     enumerable: true,
@@ -38349,6 +37998,401 @@ const ALL_IN = "all-in";
 },{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"dmYsQ":[function(require,module,exports) {
 module.exports = require('./helpers/bundle-url').getBundleURL('745A8') + "round_rect.dcb5c51a.png" + "?" + Date.now();
 
-},{"./helpers/bundle-url":"lgJ39"}]},["jjamN","6aAXe"], "6aAXe", "parcelRequire1d12")
+},{"./helpers/bundle-url":"lgJ39"}],"ls0za":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "Button", ()=>Button
+);
+var _phaserMinJs = require("./phaser.min.js");
+var _phaserMinJsDefault = parcelHelpers.interopDefault(_phaserMinJs);
+class Button extends _phaserMinJsDefault.default.GameObjects.Container {
+    constructor(scene, x, y, text, callback){
+        super(scene, x, y);
+        scene.children.add(this);
+        this.bgColor = 0;
+        this.bgMouseOverColor = 0;
+        this.fontColor = "#fff";
+        this.fontMouseOverColor = "#f39c12";
+        let tmp = this;
+        this.button = scene.add.text(0, 0, text, {
+            fontFamily: 'Quicksand',
+            fontSize: '32px',
+            color: tmp.fontColor,
+            align: 'center'
+        }).setOrigin(0.5).setInteractive({
+            useHandCursor: true
+        }).on('pointerover', ()=>{
+            tmp.button.setStyle({
+                fill: tmp.fontMouseOverColor
+            });
+            tmp.bg.tint = tmp.bgMouseOverColor;
+        }).on('pointerout', ()=>{
+            tmp.button.setStyle({
+                fill: tmp.fontColor
+            });
+            tmp.bg.tint = tmp.bgColor;
+        }).on('pointerdown', callback);
+        this.bg = scene.add.image(0, 0, "round_rect");
+        this.bg.tint = this.bgColor;
+        this.add(this.button);
+        this.add(this.bg);
+        this.bringToTop(this.button);
+        this.resize();
+    }
+    setBgColor(color) {
+        this.bg.tint = color;
+        this.bgColor = color;
+    }
+    setBgMouseOverColor(color) {
+        this.bgMouseOverColor = color;
+    }
+    setFontColor(color) {
+        this.button.setStyle({
+            fill: color
+        });
+        this.fontColor = color;
+    }
+    setFontMouseOverColor(color) {
+        this.fontMouseOverColor = color;
+    }
+    set(property, value) {
+        this.button[property] = value;
+        this.bg[property] = value;
+    }
+    setText(text) {
+        this.button.setText(text);
+        this.resize();
+    }
+    resize() {
+        let y_pad = 12;
+        let x_pad = 12;
+        let rw = this.button.displayWidth + x_pad * 2; // double padding for top and bottom
+        if (rw < 110) {
+            x_pad = (110 - this.button.displayWidth) / 2;
+            rw = this.button.displayWidth + x_pad * 2;
+        }
+        let rh = this.button.displayHeight + y_pad * 2;
+        this.bg.displayWidth = rw;
+        this.bg.displayHeight = rh;
+        // increase it by 1.3x so the button hitbox is slightly bigger than the visual hitbox
+        this.button.setPadding(x_pad * 1.3, y_pad * 1.3);
+        this.width = this.button.width;
+        this.height = this.button.height;
+        this.displayWidth = this.button.displayWidth;
+        this.displayHeight = this.button.displayHeight;
+    }
+    on(label, functor) {
+        this.button.on(label, functor);
+    }
+}
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./phaser.min.js":"boWxm"}],"1immA":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "UserSprite", ()=>UserSprite
+);
+var _card = require("./Card");
+var _playeraction = require("../messages/playeraction");
+const ABOVE = 0;
+const BELOW = 1;
+const NONE = 2;
+class UserSprite extends Phaser.GameObjects.Container {
+    constructor(scene, x, y, dealerChit){
+        super(scene, x, y);
+        scene.children.add(this);
+        this.dealerChit = dealerChit;
+        let name_str = "";
+        let bb = 0;
+        let isDealer = false;
+        this.active_user_sprite = scene.add.sprite(0, 0, "active_user_icon");
+        this.inactive_user_sprite = scene.add.sprite(0, 0, "user_icon");
+        // Scale the user sprite to 17.5% of the camera's height
+        let scaleFactor = scene.cameras.main.height / this.active_user_sprite.displayHeight;
+        this.active_user_sprite.setScale(this.active_user_sprite.scale * scaleFactor * 0.175);
+        this.inactive_user_sprite.setScale(this.inactive_user_sprite.scale * scaleFactor * 0.175);
+        this.active_user_sprite.setVisible(false);
+        this.add(this.active_user_sprite);
+        this.add(this.inactive_user_sprite);
+        this.name = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 10, name_str, {
+            fontFamily: 'Quicksand',
+            fontSize: '16px',
+            color: '#000',
+            align: 'center'
+        }).setOrigin(0.5);
+        this.add(this.name);
+        this.num_chips_label = scene.add.text(0, this.active_user_sprite.getBottomCenter().y + 32, bb + " bb", {
+            fontFamily: 'Quicksand',
+            fontSize: '16px',
+            color: '#000',
+            align: 'center'
+        }).setOrigin(0.5);
+        this.add(this.num_chips_label);
+        this.card1 = null;
+        this.card2 = null;
+        if (isDealer) {
+            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth / 2, this.y);
+            this.dealerChit.setVisible(true);
+        }
+        this.screenCenterX = scene.cameras.main.worldView.x + scene.cameras.main.width / 2;
+        this.screenCenterY = scene.cameras.main.worldView.y + scene.cameras.main.height / 2;
+        this.chips = [];
+        let chit_x = this.active_user_sprite.displayWidth * 0.8;
+        for(let i = 0; i < 4; i++){
+            let chip_sprite = scene.add.sprite(chit_x + Math.floor(Math.random() * 10), Math.floor(Math.random() * 10), "poker_chip").setOrigin(0.5);
+            chip_sprite.displayHeight = 40;
+            chip_sprite.displayWidth = 40;
+            this.chips.push(chip_sprite);
+            chip_sprite.setVisible(false);
+            this.add(chip_sprite);
+        }
+        this.chip_label = scene.add.text(chit_x, 40, '0 BB', {
+            fontFamily: 'Quicksand',
+            fontSize: '24px',
+            color: '#000',
+            align: 'center'
+        }).setOrigin(0.5);
+        this.add(this.chip_label);
+        this.chip_label.setVisible(false);
+        this.orrientation = NONE;
+    }
+    dealCards(scene) {}
+    foldCards(scene) {
+        this.makeMessage(scene, "Fold", 15419994);
+        for (let card of [
+            this.card1.card,
+            this.card1.shadow,
+            this.card2.card,
+            this.card2.shadow
+        ]){
+            let endY = card.y + card.displayHeight;
+            let playerObj = this;
+            var tween = scene.tweens.add({
+                targets: card,
+                y: endY,
+                alpha: 0.2,
+                ease: 'linear',
+                delay: 50,
+                duration: 400,
+                onComplete: function() {
+                    playerObj.deleteCards();
+                }
+            });
+        }
+    }
+    call(scene) {
+        this.makeMessage(scene, "Call", 15121498);
+    }
+    raise(scene) {
+        this.makeMessage(scene, "Raise", 3969731);
+    }
+    makeMessage(scene, message, color) {
+        let callMsg = scene.add.text(this.x, this.y, message, {
+            fontFamily: 'Quicksand',
+            fontSize: '36px',
+            color: '#fff',
+            align: 'center'
+        }).setOrigin(0.5).setVisible(true);
+        let padding = 12;
+        let rw = callMsg.displayWidth + padding * 2;
+        let rh = callMsg.displayHeight + padding;
+        let bg = scene.add.image(this.x, this.y, "round_rect");
+        bg.displayWidth = rw;
+        bg.displayHeight = rh;
+        bg.tint = color;
+        var tween = scene.tweens.add({
+            targets: [
+                callMsg,
+                bg
+            ],
+            alpha: 0,
+            ease: 'linear',
+            delay: 1200,
+            duration: 560,
+            onComplete: function() {
+                callMsg.destroy();
+                bg.destroy();
+            }
+        });
+        scene.children.bringToTop(callMsg);
+    }
+    updatePlayer(scene, player) {
+        let name_str = player.id;
+        let bb = player.bb;
+        let hand = Array.from(player.hand.values());
+        let isDealer = player.isDealer;
+        let active = player.isTurn;
+        this.active_user_sprite.setVisible(active);
+        this.inactive_user_sprite.setVisible(!active);
+        if (scene.state.running && !player.inRound) this.inactive_user_sprite.alpha = 0.5;
+        else this.inactive_user_sprite.alpha = 1;
+        if (isDealer) {
+            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth * 0.75, this.y + 15);
+            this.dealerChit.setVisible(true);
+        }
+        this.name.text = name_str;
+        this.num_chips_label.setText(bb + " bb");
+        let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
+        if (player.hand.length > 0 && this.oldPlayerState.hand.length == 0) this.dealCards(scene);
+        // TODO: if in a round, a player does call -> fold -> call and the game moves to the next state, this logic doesn't work because the same player goes twice in a row
+        if (!player.isTurn && this.oldPlayerState.isTurn) {
+            if (player.lastAction === _playeraction.FOLD) this.foldCards(scene);
+            else if (player.lastAction === _playeraction.CALL) this.call(scene);
+            else if (player.lastAction === _playeraction.RAISE) this.raise(scene);
+        }
+        if (hand.length > 1 && player.inRound && JSON.stringify(player.hand) !== JSON.stringify(this.oldPlayerState.hand) || player.shouldShowHand != this.oldPlayerState.shouldShowHand) {
+            this.deleteCards();
+            this.drawCards(scene, player);
+        }
+        // Move the chips above or below the player
+        // if the orrientation has changed
+        if (newOrrientation != this.orrientation) {
+            let deltaY = 40;
+            if (newOrrientation == ABOVE) deltaY *= -1;
+            if (this.orrientation != NONE) deltaY *= 2;
+            this.orrientation = newOrrientation;
+            for(let i = 0; i < this.chips.length; i++)this.chips[i].y += deltaY;
+            this.chip_label.y += deltaY;
+        }
+        for(let i = 0; i < this.chips.length; i++)this.chips[i].setVisible(scene.state.running);
+        this.chip_label.setVisible(scene.state.running);
+        this.chip_label.text = player.currentBet + ' BB';
+        this.oldPlayerState = player;
+    }
+    setNewPlayer(scene, player) {
+        let name_str = player.id;
+        let bb = player.bb;
+        let hand = Array.from(player.hand.values());
+        let isDealer = player.isDealer;
+        let active = player.isTurn;
+        this.active_user_sprite.setVisible(active);
+        this.inactive_user_sprite.setVisible(!active);
+        if (scene.state.running && !player.inRound) this.inactive_user_sprite.alpha = 0.5;
+        else this.inactive_user_sprite.alpha = 1;
+        if (isDealer) {
+            this.dealerChit.setPosition(this.x - this.active_user_sprite.displayWidth * 0.75, this.y + 15);
+            this.dealerChit.setVisible(true);
+        }
+        this.name.text = name_str;
+        this.num_chips_label.setText(bb + " bb");
+        this.deleteCards();
+        let newOrrientation = this.y < this.screenCenterY ? BELOW : ABOVE;
+        if (hand.length > 1 && player.inRound) this.drawCards(scene, player);
+        // Move the chips above or below the player
+        // if the orrientation has changed
+        if (newOrrientation != this.orrientation) {
+            let deltaY = 40;
+            if (newOrrientation == ABOVE) deltaY *= -1;
+            if (this.orrientation != NONE) deltaY *= 2;
+            this.orrientation = newOrrientation;
+            for(let i = 0; i < this.chips.length; i++)this.chips[i].y += deltaY;
+            this.chip_label.y += deltaY;
+        }
+        for(let i = 0; i < this.chips.length; i++)this.chips[i].setVisible(scene.state.running);
+        this.chip_label.setVisible(scene.state.running);
+        this.chip_label.text = player.currentBet + ' BB';
+        this.oldPlayerState = player;
+    }
+    drawCards(scene, player) {
+        if (player.id == scene.userId || player.shouldShowHand) {
+            this.card1 = new _card.CardSprite(scene, player.hand[0].suit, player.hand[0].value);
+            this.card2 = new _card.CardSprite(scene, player.hand[1].suit, player.hand[1].value);
+        } else {
+            this.card1 = new _card.CardBackSprite(scene);
+            this.card2 = new _card.CardBackSprite(scene);
+        }
+        // Scale the card to 80% of the user sprite height
+        let scaleFactor = this.active_user_sprite.displayHeight / this.card1.card.displayHeight;
+        this.card1.setScale(scaleFactor * this.card1.card.scale * 0.75);
+        this.card2.setScale(scaleFactor * this.card2.card.scale * 0.75);
+        this.add(this.card1);
+        this.add(this.card2);
+        // Calculate the y of the card so that a non-rotated card would be exactly at
+        // the bottom of the user sprite
+        let y = this.active_user_sprite.displayHeight * 0.5 - this.card1.card.displayHeight * 0.4;
+        this.card1.setPosition(this.card1.card.width * this.card1.card.scale * 0.35, y);
+        this.card2.setPosition(-this.card1.card.width * this.card1.card.scale * 0.35, y);
+        this.card1.setAngle(3);
+        this.card2.setAngle(-3);
+        this.bringToTop(this.card2);
+        this.bringToTop(this.card1);
+        // Add card mask
+        for (let card of [
+            this.card1,
+            this.card2
+        ]){
+            let cardMask = scene.add.rectangle(this.x - this.active_user_sprite.displayWidth, this.y + this.active_user_sprite.displayHeight / 2, this.active_user_sprite.displayWidth * 2, 100, 0).setOrigin(0).setVisible(false);
+            let mask = new Phaser.Display.Masks.BitmapMask(scene, cardMask);
+            card.card.mask = mask;
+            card.shadow.mask = mask;
+            mask.invertAlpha = true;
+        }
+    }
+    deleteCards() {
+        // TODO: this deletion code crashes things when the screen is resized
+        if (this.card1 != null) this.card1.destroy();
+        if (this.card2 != null) this.card2.destroy();
+    }
+}
+
+},{"./Card":"GegN8","../messages/playeraction":"lgSKO","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"GegN8":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "CardSprite", ()=>CardSprite
+);
+parcelHelpers.export(exports, "CardBackSprite", ()=>CardBackSprite
+);
+var _phaserMinJs = require("./phaser.min.js");
+var _phaserMinJsDefault = parcelHelpers.interopDefault(_phaserMinJs);
+var _gameOptions = require("./GameOptions");
+class CardBase extends _phaserMinJsDefault.default.GameObjects.Container {
+    constructor(scene, card, shadow){
+        super(scene, 0, 0);
+        scene.children.add(this);
+        this.card = card;
+        this.shadow = shadow;
+        this.card.setOrigin(0.5);
+        this.shadow.setOrigin(0.5);
+        this.card.setPosition(0, 0);
+        this.shadow.setPosition(0, 0);
+        this.shadow.x = -3;
+        this.shadow.y = 2;
+        this.shadow.scale = this.card.scale;
+        this.shadow.tint = 0;
+        this.shadow.alpha = 0.6;
+        this.shadow.angle = this.card.angle;
+        this.add(this.card);
+        this.add(this.shadow);
+        this.bringToTop(this.card);
+    }
+    setScale(s) {
+        this.shadow.scale = s;
+        this.card.scale = s;
+    }
+}
+class CardSprite extends CardBase {
+    constructor(scene, suit, value){
+        super(scene, scene.createCard(suit, value), scene.createCard(suit, value));
+    }
+}
+class CardBackSprite extends CardBase {
+    constructor(scene){
+        super(scene, scene.add.sprite(0, 0, "card_back").setScale(_gameOptions.gameOptions.cardScale * 0.64), scene.add.sprite(0, 0, "card_back").setScale(_gameOptions.gameOptions.cardScale * 0.64));
+    }
+}
+
+},{"./phaser.min.js":"boWxm","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./GameOptions":"eXjCt"}],"eXjCt":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "gameOptions", ()=>gameOptions
+);
+let gameOptions = {
+    // card width, in pixels
+    cardWidth: 334,
+    // card height, in pixels
+    cardHeight: 440,
+    cardScale: 0.2
+};
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["jjamN","6aAXe"], "6aAXe", "parcelRequire1d12")
 
 //# sourceMappingURL=devIndex.869a5add.js.map
